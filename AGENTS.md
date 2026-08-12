@@ -4,76 +4,120 @@
 
 You are an implementation agent working on HyperScale Commerce.
 
-The goal is to evolve a deliberately simple commerce application into a
-cloud-native distributed platform capable of:
+The project evolves a simple commerce application into a cloud-native,
+event-driven distributed platform capable of:
 
 - 10,000+ concurrent users
 - sub-200ms p95 latency for defined critical APIs
 - 5x traffic spikes
 - 99.9% availability
 - zero intentional data loss
-- horizontally scalable workloads
 
-You are NOT responsible for independently redesigning the architecture.
+You operate as an engineering agent inside a controlled engineering harness.
 
-The architecture is evolved incrementally according to the BootCamp phases.
+You are not the autonomous architect of the system.
 
----
-
-# 1. Read Before Coding
-
-Before modifying code, read:
-
-1. docs/constitution.md
-2. docs/requirements.md
-3. docs/architecture.md
-4. the current BootCamp phase
-5. relevant ADRs
-
-Do not begin implementation until you understand the current constraints.
+Architecture, constraints, task scope, and verification requirements are
+defined by repository documentation and approved tasks.
 
 ---
 
-# 2. Core Principles
+# 1. Source of Truth
 
-## Correctness before performance
+When making engineering decisions, use this precedence:
 
-Do not optimize code without evidence.
+1. This file: AGENTS.md
+2. docs/constitution.md
+3. docs/bootcamp/current-phase.md
+4. docs/bootcamp/<current-phase>.md
+5. docs/bootcamp/<current-phase>-plan.md
+6. Architecture Decision Records under docs/adr/
+7. Task-specific instructions
 
-## Measure before changing architecture
+If two sources conflict, do not silently choose one.
 
-Performance claims must be supported by measurements.
-
-## Simple before distributed
-
-Do not introduce distributed infrastructure unless the current phase requires it.
-
-## PostgreSQL is the source of truth
-
-Do not introduce another system as the authoritative source of business data
-without an explicit ADR.
-
-## Explicit failure semantics
-
-Every distributed operation must define:
-
-- timeout behavior
-- retry behavior
-- idempotency
-- failure recovery
-- observability
-
-## Architecture must be enforceable
-
-Do not rely only on documentation.
-
-Important architectural rules should be tested automatically.
+Stop and report the conflict.
 
 ---
 
-# 3. Technology Introduction Rules
+# 2. Read Before Working
 
-Do NOT introduce the following unless the current phase explicitly allows it:
+Before modifying code, determine:
+
+- current BootCamp phase
+- current task
+- task approval status
+- relevant acceptance criteria
+- applicable architecture constraints
+- applicable engineering skills
+
+At minimum, read:
+
+- AGENTS.md
+- docs/constitution.md
+- docs/bootcamp/current-phase.md
+- relevant phase documentation
+- relevant task definition
+
+---
+
+# 3. Skills
+
+Reusable engineering procedures are stored under:
+
+skills/
+
+Skills define HOW a particular engineering activity should be performed.
+
+Examples:
+
+- implement-bootcamp-task
+- verify-task
+- architecture-review
+- create-adr
+- performance-test
+- security-review
+- failure-analysis
+- phase-review
+- production-readiness
+
+Use the appropriate skill when performing that type of work.
+
+Do not copy skill procedures into task prompts.
+
+Task prompts should identify the task and invoke the relevant skill.
+
+---
+
+# 4. Scope Control
+
+Implement ONLY the approved task.
+
+Do not:
+
+- implement future tasks
+- refactor unrelated code
+- upgrade dependencies unnecessarily
+- introduce speculative abstractions
+- introduce infrastructure belonging to later phases
+- redesign architecture without approval
+
+If completing the task requires work outside its approved scope:
+
+1. stop
+2. explain the dependency
+3. identify the required architectural decision
+4. request approval
+
+Do not silently expand scope.
+
+---
+
+# 5. Technology Introduction
+
+Do not introduce technologies merely because they may eventually be useful.
+
+Technologies such as:
 
 - Kafka
 - Redis
@@ -82,155 +126,151 @@ Do NOT introduce the following unless the current phase explicitly allows it:
 - microservices
 - CQRS
 - service mesh
-- distributed transactions
 - event sourcing
 
-When a technology becomes necessary, document:
+must only be introduced when allowed by the current BootCamp phase.
 
-1. the problem
-2. alternatives considered
-3. why the technology solves the problem
-4. operational cost
-5. failure modes
+If a new technology is required:
 
-Create an ADR when required.
-
----
-
-# 4. Coding Rules
-
-Prefer:
-
-- small modules
-- explicit dependencies
-- immutable data
-- clear domain boundaries
-- dependency inversion
-- testable components
-
-Avoid:
-
-- speculative abstractions
-- generic frameworks
-- unnecessary design patterns
-- premature optimization
-- hidden global state
-- cross-domain database access
+1. identify the problem
+2. evaluate alternatives
+3. document the tradeoffs
+4. create an ADR when required
+5. obtain approval when required
 
 ---
 
-# 5. Testing
+# 6. Architecture
 
-Every feature must have appropriate tests.
+The system follows:
 
-Minimum expectations:
+- domain-driven design
+- bounded-context isolation
+- explicit dependency direction
+- PostgreSQL as the source of truth
+- evolutionary architecture
 
-- unit tests for business logic
-- integration tests for persistence
-- API tests for externally visible behavior
+Do not bypass architectural boundaries for convenience.
 
-When distributed behavior exists, add:
+Architecture rules should be enforced automatically whenever practical.
 
+---
+
+# 7. Testing
+
+Implementation must include appropriate verification.
+
+Depending on the task, this may include:
+
+- unit tests
+- integration tests
+- architecture tests
+- API tests
 - contract tests
 - failure tests
-- idempotency tests
+- performance tests
+
+Never claim that something works without running the relevant verification.
 
 ---
 
-# 6. Observability
+# 8. Evidence
 
-Production-relevant operations should provide:
+Engineering claims must be supported by evidence.
 
-- structured logs
-- metrics
-- distributed tracing where applicable
+Examples:
 
-Never log:
+Do not say:
 
-- passwords
-- access tokens
-- API keys
-- secrets
-- sensitive customer information
+> The API is fast.
 
----
+Instead provide:
 
-# 7. Performance
+> p95 = 137ms at 500 RPS under the defined workload.
 
-Never claim that a performance target has been achieved without measurement.
+Do not say:
 
-Performance reports should contain:
+> The system is resilient.
 
-- workload
-- concurrency
-- request rate
-- duration
-- p50
-- p95
-- p99
-- error rate
-- CPU
-- memory
-- relevant database metrics
+Instead provide:
+
+> Payment dependency was unavailable for 60 seconds and order processing
+> remained available with zero lost orders.
 
 ---
 
-# 8. Scope Discipline
+# 9. Documentation
 
-Only modify files necessary for the assigned task.
+Documentation is part of the implementation.
 
-Do not refactor unrelated code.
+Update documentation when:
 
-Do not upgrade dependencies unless required.
+- architecture changes
+- operational behavior changes
+- developer workflow changes
+- new infrastructure is introduced
+- a significant tradeoff is made
 
-Do not change architecture without documenting the reason.
+Use ADRs for significant architectural decisions.
 
 ---
 
-# 9. Verification
+# 10. Git Discipline
 
 Before completing a task:
 
-1. run tests
-2. run static analysis
-3. run formatting
-4. verify migrations
-5. verify application startup
-6. inspect the final diff
+- inspect git status
+- inspect the complete diff
+- remove unrelated changes
+- ensure no secrets are committed
+- ensure generated files are intentional
 
-Report:
-
-- files changed
-- tests executed
-- results
-- architectural impact
-- risks
-- remaining work
+Do not modify unrelated files.
 
 ---
 
-# 10. When Requirements Are Ambiguous
-
-Do not silently invent architectural requirements.
-
-Prefer the smallest implementation consistent with:
-
-- current phase
-- architecture
-- constitution
-- acceptance criteria
-
-If ambiguity materially affects architecture, stop and explain the ambiguity.
-
----
-
-# 11. Definition of Done
+# 11. Completion
 
 A task is complete only when:
 
-- implementation is complete
-- tests pass
-- relevant documentation is updated
-- architectural rules remain satisfied
-- no unnecessary dependencies were introduced
-- verification evidence exists
+- acceptance criteria are satisfied
+- relevant tests pass
+- verification has been executed
+- architecture remains compliant
+- documentation is updated where necessary
+- git diff has been reviewed
+- evidence is available
+
+Do not automatically continue to another task.
+
+Stop after the assigned task is complete.
+
+---
+
+# 12. Phase Progression
+
+The BootCamp is sequential.
+
+Do not advance phases based on assumption.
+
+A phase may advance only after its phase-review process has passed.
+
+The repository should provide evidence for the phase completion.
+
+---
+
+# 13. When Uncertain
+
+Prefer:
+
+- smaller changes
+- existing project conventions
+- explicit decisions
+- measurable evidence
+- reversible changes
+
+Do not guess about architecture.
+
+Do not hide uncertainty.
+
+Do not optimize prematurely.

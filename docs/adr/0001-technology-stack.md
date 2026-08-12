@@ -1,5 +1,9 @@
 # ADR-0001: Technology Stack
 
+> Amended 2026-08-12: implementation language changed from Java to Kotlin on
+> the JVM, aligning with the technology whitelist in
+> `docs/bootcamp/current-phase.md`. All other decisions are unchanged.
+
 - Status: Accepted
 - Date: 2026-08-12
 - Phase: 0 — Engineering Foundation
@@ -20,8 +24,8 @@ formatting verification, and a CI pipeline.
 
 ## Alternatives Considered
 
-1. **Java / Spring Boot** — Spring Boot 3.x, Gradle, Flyway, JUnit 5,
-   Testcontainers, springdoc-openapi, Spotless/Checkstyle.
+1. **Kotlin / Spring Boot** — Kotlin on the JVM, Spring Boot, Gradle, Flyway,
+   JUnit 5, Testcontainers, springdoc-openapi, Spotless/Checkstyle.
 2. **TypeScript / Node (NestJS)** — fast iteration, strong OpenAPI support;
    weaker compile-time guarantees, larger operational variance at scale.
 3. **Go** — small binaries, explicit code; OpenAPI and migration tooling are
@@ -31,7 +35,7 @@ formatting verification, and a CI pipeline.
 
 ## Decision
 
-Adopt **Java 21 with Spring Boot 3.x**, with:
+Adopt **Kotlin on JDK 21 with Spring Boot**, with:
 
 - Gradle (Kotlin DSL) with the wrapper committed to the repository
 - Flyway for database migrations; PostgreSQL 16 via Docker Compose
@@ -45,10 +49,12 @@ Adopt **Java 21 with Spring Boot 3.x**, with:
 
 Rationale: Spring Boot satisfies every Phase 0 acceptance criterion with
 mature, first-party integrations (actuator health groups, Flyway auto-run,
-Micrometer, springdoc). Java 21 LTS provides long support lifetime and the
+Micrometer, springdoc). JDK 21 LTS provides long support lifetime and the
 strongest ecosystem for the later BootCamp phases (performance engineering,
 event-driven architecture, service extraction) without locking the project
-into any of those technologies now.
+into any of those technologies now. Kotlin is whitelisted in
+`docs/bootcamp/current-phase.md`, runs on the same JVM platform, and keeps
+full interoperability with the Spring ecosystem.
 
 ## Operational Cost
 

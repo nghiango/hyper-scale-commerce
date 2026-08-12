@@ -23,10 +23,27 @@ Current stage: **Phase 0 — Engineering Foundation** (in progress).
 
 No global Gradle installation is required; the Gradle wrapper is used.
 
-## Development setup
+## Local infrastructure
 
-The application skeleton is not yet implemented (Phase 0 tasks P0-02 onward).
-Once available, the intended workflow is:
+PostgreSQL 16 runs via Docker Compose:
+
+```sh
+docker compose up -d    # start PostgreSQL (waits for healthcheck)
+docker compose ps       # check status
+docker compose down     # stop (data persists in the postgres-data volume)
+```
+
+Connection defaults (local development only, overridable via environment):
+
+| Setting | Default | Environment variable |
+|---|---|---|
+| Host | `localhost` | `POSTGRES_HOST` |
+| Port | `5432` | `POSTGRES_PORT` |
+| Database | `hyperscale` | `POSTGRES_DB` |
+| User | `hyperscale` | `POSTGRES_USER` |
+| Password | `hyperscale` | `POSTGRES_PASSWORD` |
+
+## Development setup
 
 ```sh
 git clone <repository-url>
@@ -35,7 +52,12 @@ cd hyper-scale-commerce
 make up        # start PostgreSQL via Docker Compose
 make test      # run unit and integration tests
 make verify    # formatting check, static analysis, build, all tests
+make run       # run the app with the local profile (human-readable logs)
+make down      # stop infrastructure
+make clean     # remove build outputs
 ```
 
-Until then, this repository contains documentation only. See
-`docs/bootcamp/phase-00-plan.md` for the approved implementation plan.
+Without the `local` profile, application logs are emitted as JSON for
+aggregation (see `app/src/main/resources/logback-spring.xml`).
+
+See `docs/bootcamp/phase-00-plan.md` for the approved implementation plan.

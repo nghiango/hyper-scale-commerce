@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: hyper-scale-commerce
+  main:
+    banner-mode: "off"
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:hyperscale}
+    username: ${POSTGRES_USER:hyperscale}
+    password: ${POSTGRES_PASSWORD:hyperscale}
+  flyway:
+    enabled: true
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+app:
+  name: ${APP_NAME:hyper-scale-commerce}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState, db
