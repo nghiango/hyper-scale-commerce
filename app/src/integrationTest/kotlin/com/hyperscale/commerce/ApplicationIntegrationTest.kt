@@ -39,13 +39,37 @@ constructor(
   }
 
   @Test
-  fun `flyway baseline migration is applied`() {
+  fun `flyway migrations are applied`() {
     val version =
         jdbcTemplate.queryForObject(
             "SELECT max(version) FROM flyway_schema_history WHERE success",
             String::class.java,
         )
-    assertThat(version).isEqualTo("1")
+    assertThat(version).isEqualTo("2")
+  }
+
+  @Test
+  fun `catalog products table can be inserted and selected`() {
+    jdbcTemplate.update(
+        """
+        INSERT INTO catalog.products (sku, name, description, price, availability, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, now(), now())
+        """
+            .trimIndent(),
+        "TEST-SKU",
+        "Test Product",
+        "A test product",
+        12345,
+        "IN_STOCK",
+    )
+
+    val name =
+        jdbcTemplate.queryForObject(
+            "SELECT name FROM catalog.products WHERE sku = ?",
+            String::class.java,
+            "TEST-SKU",
+        )
+    assertThat(name).isEqualTo("Test Product")
   }
 
   @Test

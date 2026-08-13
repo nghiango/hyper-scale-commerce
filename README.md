@@ -4,7 +4,19 @@ A commerce platform that evolves incrementally from a modular monolith into a
 resilient cloud-native distributed system, following the HyperScale Commerce
 Engineering BootCamp phases.
 
-Current stage: **Phase 0 — Engineering Foundation** (in progress).
+Current stage: **Phase 1 — Catalog Module** (in progress).
+
+## Catalog API
+
+The Catalog endpoints are available once the application is running:
+
+- `GET /catalog/products` — list products with optional `query`, `page`, and `size`
+- `GET /catalog/products/{id}` — get a product by id
+- `GET /catalog/products/sku/{sku}` — get a product by SKU
+- `GET /catalog/products/{id}/availability` — get product availability
+
+OpenAPI documentation is generated at `/v3/api-docs` and rendered by Swagger UI
+at `/swagger-ui.html`.
 
 ## Documentation
 
@@ -60,4 +72,4 @@ make clean     # remove build outputs
 Without the `local` profile, application logs are emitted as JSON for
 aggregation (see `app/src/main/resources/logback-spring.xml`).
 
-See `docs/bootcamp/phase-00-plan.md` for the approved implementation plan.
+See `docs/bootcamp/phase-00-plan.md` and `docs/bootcamp/phase-01-plan.md` for the approved implementation plans.
