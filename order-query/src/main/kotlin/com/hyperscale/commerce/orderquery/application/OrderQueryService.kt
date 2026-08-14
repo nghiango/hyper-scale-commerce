@@ -1,7 +1,7 @@
-package com.hyperscale.commerce.modules.order.application
+package com.hyperscale.commerce.orderquery.application
 
-import com.hyperscale.commerce.jooq.order.Tables.ORDER_READ_MODEL
-import com.hyperscale.commerce.modules.order.domain.OrderNotFoundException
+import com.hyperscale.commerce.orderquery.domain.OrderNotFoundException
+import com.hyperscale.commerce.orderquery.jooq.order_query.Tables.ORDER_READ_MODEL
 import org.jooq.DSLContext
 import org.jooq.Record
 import org.springframework.stereotype.Service

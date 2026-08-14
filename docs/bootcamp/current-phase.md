@@ -1,10 +1,10 @@
 # Current BootCamp Phase
 
-Phase: 05
+Phase: 06
 
-Name: Service Extraction
+Name: Resilience Engineering
 
-Status: IN_PROGRESS
+Status: PLANNED
 
 Allowed technologies:
 
@@ -36,4 +36,4 @@ Forbidden until later phases:
 
 Next milestone:
 
-Phase 05 exit review and evidence
+Phase 06 plan creation

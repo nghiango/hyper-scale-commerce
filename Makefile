@@ -1,10 +1,14 @@
-.PHONY: up down test verify run clean
+.PHONY: up down services test verify run clean
 
 up: ## Start local infrastructure (PostgreSQL)
 	docker compose up -d
 
 down: ## Stop local infrastructure
 	docker compose down
+
+services: ## Build service images and start both services in containers
+	./gradlew :app:bootJar :order-query:bootJar
+	docker compose --profile services up -d --build
 
 test: ## Run unit and integration tests
 	./gradlew test integrationTest

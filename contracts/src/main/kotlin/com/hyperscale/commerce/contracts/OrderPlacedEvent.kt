@@ -1,4 +1,4 @@
-package com.hyperscale.commerce.modules.order.application
+package com.hyperscale.commerce.contracts
 
 import java.time.Instant
 

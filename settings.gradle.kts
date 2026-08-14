@@ -5,3 +5,5 @@ plugins {
 }
 
 include("app")
+include("contracts")
+include("order-query")

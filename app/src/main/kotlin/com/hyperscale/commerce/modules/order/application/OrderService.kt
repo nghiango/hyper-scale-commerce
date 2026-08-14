@@ -1,5 +1,7 @@
 package com.hyperscale.commerce.modules.order.application
 
+import com.hyperscale.commerce.contracts.OrderPlacedEvent
+import com.hyperscale.commerce.contracts.OrderPlacedItem
 import com.hyperscale.commerce.modules.order.domain.Order
 import com.hyperscale.commerce.modules.order.domain.OrderItem
 import com.hyperscale.commerce.modules.order.domain.OrderRepository

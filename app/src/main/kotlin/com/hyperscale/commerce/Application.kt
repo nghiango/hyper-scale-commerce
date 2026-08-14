@@ -4,7 +4,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan
 import org.springframework.boot.runApplication
 
-@SpringBootApplication @ConfigurationPropertiesScan class Application
+@SpringBootApplication(
+    scanBasePackages = ["com.hyperscale.commerce.modules", "com.hyperscale.commerce.config"])
+@ConfigurationPropertiesScan
+class Application
 
 @Suppress("SpreadOperator")
 fun main(args: Array<String>) {

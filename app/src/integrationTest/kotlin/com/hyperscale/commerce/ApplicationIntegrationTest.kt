@@ -45,7 +45,7 @@ constructor(
             "SELECT max(version) FROM flyway_schema_history WHERE success",
             String::class.java,
         )
-    assertThat(version).isEqualTo("7")
+    assertThat(version).isEqualTo("6")
   }
 
   @Test

@@ -18,7 +18,7 @@ Environment: local Docker PostgreSQL 16 + Kafka (Testcontainers), JDK 21, Spring
 | Measurement | Value |
 |---|---:|
 | POST /orders latency | 114.0 ms |
-| End-to-end (POST → read model visible) | 1016.3 ms |
+| End-to-end (POST → read model visible) | 1023.4 ms |
 
 ## Idempotency
 
@@ -30,10 +30,10 @@ Load: 20 concurrent users, ramp-up 1s, duration 3s.
 
 | Endpoint | p95 (ms) | Throughput (RPS) | Error rate |
 |---|---:|---:|---:|
-| GET /orders/{id} | 1.30 | 23315.00 | 0.00 |
-| GET /orders | 1.84 | 16630.33 | 0.00 |
+| GET /orders/{id} | 1.44 | 21272.33 | 0.00 |
+| GET /orders | 1.91 | 16008.67 | 0.00 |
 
 ## Catalog SLO re-verification
 
-Spot check with 5 seeded products: GET /catalog/products/{id} at 20 concurrent users → p95 1.35 ms, error rate 0.00.
+Spot check with 5 seeded products: GET /catalog/products/{id} at 20 concurrent users → p95 1.44 ms, error rate 0.00.
 The full catalog SLO verification (`CatalogSloVerificationTest`) re-runs in `make verify`; see `p2-slo-verification.md`.

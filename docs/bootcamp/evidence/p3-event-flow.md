@@ -9,7 +9,7 @@ Environment: local Docker PostgreSQL 16 + Kafka (Testcontainers), JDK 21, Spring
 | Step | Detail |
 |---|---|
 | POST /orders | 201, order id 1 |
-| Outbox event | OrderPlaced, event id `85d95343-34a3-4302-b648-d3d44eb0b38d` |
+| Outbox event | OrderPlaced, event id `96c6586a-0110-4486-a8e6-4a990b104c4d` |
 | Kafka topic | order-placed |
 | Inventory reservation | sku PERF-SKU-00001, quantity 2 |
 
@@ -17,8 +17,8 @@ Environment: local Docker PostgreSQL 16 + Kafka (Testcontainers), JDK 21, Spring
 
 | Measurement | Value |
 |---|---:|
-| POST /orders latency | 22.2 ms |
-| End-to-end (POST → reservation) | 1511.4 ms |
+| POST /orders latency | 28.0 ms |
+| End-to-end (POST → reservation) | 1521.0 ms |
 
 ## Idempotency
 

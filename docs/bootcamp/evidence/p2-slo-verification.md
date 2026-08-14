@@ -5,7 +5,7 @@ Load test: ramp-up 1s, duration 5s.
 
 | SLO | Endpoint | Concurrency | p95 (ms) | RPS | Error rate | Result |
 |---|---|---:|---:|---:|---:|---|
-| p95 < 100ms at 100 RPS | GET /catalog/products/{id} | 100 | 9.47 | 19474.20 | 0.00 | PASS |
-| p95 < 200ms at 100 RPS | GET /catalog/products | 100 | 30.44 | 9377.00 | 0.00 | PASS |
-| p95 < 300ms at 50 RPS | GET /catalog/products?query=Product | 50 | 11.49 | 9994.60 | 0.00 | PASS |
-| p95 < 300ms at 500 RPS | GET /catalog/products/{id} (5x spike) | 500 | 69.80 | 14004.20 | 0.00 | PASS |
+| p95 < 100ms at 100 RPS | GET /catalog/products/{id} | 100 | 8.72 | 20866.20 | 0.00 | PASS |
+| p95 < 200ms at 100 RPS | GET /catalog/products | 100 | 27.80 | 10204.20 | 0.00 | PASS |
+| p95 < 300ms at 50 RPS | GET /catalog/products?query=Product | 50 | 12.14 | 9615.40 | 0.00 | PASS |
+| p95 < 300ms at 500 RPS | GET /catalog/products/{id} (5x spike) | 500 | 73.04 | 14438.20 | 0.00 | PASS |

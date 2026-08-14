@@ -4,7 +4,7 @@ A commerce platform that evolves incrementally from a modular monolith into a
 resilient cloud-native distributed system, following the HyperScale Commerce
 Engineering BootCamp phases.
 
-Current stage: **Phase 1 — Catalog Module** (in progress).
+Current stage: **Phase 5 — Service Extraction** (in progress).
 
 ## Catalog API
 
@@ -71,5 +71,42 @@ make clean     # remove build outputs
 
 Without the `local` profile, application logs are emitted as JSON for
 aggregation (see `app/src/main/resources/logback-spring.xml`).
+
+## Running both services
+
+Phase 5 extracts the Order query side into the `order-query` service. The
+monolith (`app`) serves the command side and Catalog/Inventory; `order-query`
+serves `GET /orders*` from its own read model.
+
+### Locally via bootRun (two terminals)
+
+```sh
+./gradlew :app:bootRun          # monolith on http://localhost:8080
+./gradlew :order-query:bootRun  # order-query on http://localhost:8081
+```
+
+Start PostgreSQL and Kafka first with `make up`.
+
+### As containers via Compose
+
+```sh
+make services   # build bootJars, build images, start both services
+```
+
+Or directly:
+
+```sh
+./gradlew :app:bootJar :order-query:bootJar
+docker compose --profile services up -d --build
+```
+
+Both services wait for healthy PostgreSQL and Kafka, then expose:
+
+| Service | Port | Key endpoints |
+|---|---|---|
+| `app` | 8080 | `POST /orders`, Catalog, Inventory |
+| `order-query` | 8081 | `GET /orders`, `GET /orders/{id}` |
+
+Stop everything (including the services) with `make down`.
 
 See `docs/bootcamp/phase-00-plan.md` and `docs/bootcamp/phase-01-plan.md` for the approved implementation plans.

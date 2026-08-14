@@ -56,15 +56,4 @@ class OrderArchitectureTest {
               "..order.application..",
               "..order.api..",
           )
-
-  @ArchTest
-  val queryAndProjectionShouldNotUseWriteRepository: ArchRule =
-      noClasses()
-          .that()
-          .resideInAPackage("..order.application..")
-          .and()
-          .haveNameMatching(".*(OrderQueryService|OrderPlacedProjection)")
-          .should()
-          .dependOnClassesThat()
-          .haveSimpleName("OrderRepository")
 }

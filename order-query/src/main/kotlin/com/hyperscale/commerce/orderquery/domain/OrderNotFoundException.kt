@@ -1,3 +1,3 @@
-package com.hyperscale.commerce.modules.order.domain
+package com.hyperscale.commerce.orderquery.domain
 
 class OrderNotFoundException(message: String) : RuntimeException(message)

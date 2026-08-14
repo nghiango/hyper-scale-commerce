@@ -1,18 +1,12 @@
 plugins {
-  kotlin("jvm") version "2.2.21"
-  kotlin("plugin.spring") version "2.2.21"
+  kotlin("jvm")
+  kotlin("plugin.spring")
   id("org.springframework.boot") version "4.0.0"
   id("io.spring.dependency-management") version "1.1.7"
-  id("com.diffplug.spotless") version "7.0.2"
-  id("io.gitlab.arturbosch.detekt") version "1.23.8"
+  id("com.diffplug.spotless")
+  id("io.gitlab.arturbosch.detekt")
   id("org.jooq.jooq-codegen-gradle") version "3.19.28"
 }
-
-group = "com.hyperscale.commerce"
-
-version = "0.0.1-SNAPSHOT"
-
-kotlin { jvmToolchain(21) }
 
 jooq {
   configuration {
@@ -52,8 +46,6 @@ tasks.named("compileJava") { dependsOn("jooqCodegen") }
 
 tasks.named("compileKotlin") { dependsOn("jooqCodegen") }
 
-repositories { mavenCentral() }
-
 val integrationTestSourceSet =
     sourceSets.create("integrationTest") {
       compileClasspath += sourceSets.main.get().output
@@ -65,6 +57,7 @@ configurations["integrationTestImplementation"].extendsFrom(configurations["test
 configurations["integrationTestRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
 
 dependencies {
+  implementation(project(":contracts"))
   implementation("org.springframework.boot:spring-boot-starter-web")
   implementation("org.springframework.boot:spring-boot-starter-jackson")
   implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -89,6 +82,7 @@ dependencies {
   detekt("io.gitlab.arturbosch.detekt:detekt-cli:1.23.8")
   detekt("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21")
 
+  "integrationTestImplementation"(project(":order-query"))
   "integrationTestImplementation"("org.springframework.boot:spring-boot-starter-test")
   "integrationTestImplementation"("org.springframework.boot:spring-boot-testcontainers")
   "integrationTestImplementation"("org.testcontainers:junit-jupiter:1.21.3")
@@ -114,9 +108,4 @@ tasks.withType<Test> {
   maxHeapSize = "1g"
   jvmArgs("-XX:+UseG1GC")
   testLogging { events("passed", "failed", "skipped") }
-}
-
-spotless {
-  kotlin { ktfmt() }
-  kotlinGradle { ktfmt() }
 }

@@ -2,50 +2,82 @@
 
 ## Current Stage
 
-Phase 0 — Engineering Foundation
+Phase 5 — Service Extraction (complete; Phase 6 Resilience Engineering planned)
 
-## Target Initial Architecture
+## Target Architecture
 
-Modular monolith.
+Two independently deployable services communicating exclusively through Kafka
+events, sharing one PostgreSQL instance with per-service schemas.
 
 ```text
                 Client
                   |
-                  v
-              REST API
-                  |
         +---------+---------+
-        |         |         |
-     Catalog    Cart      Order
-        |         |         |
-        +---------+---------+
-                  |
-                  v
-              PostgreSQL
+        |                   |
+        v                   v
+   app (monolith)      order-query
+   POST /orders        GET /orders/{id}
+   GET /catalog/*      GET /orders?page=&size=
+   Inventory consumer
+        |                   ^
+        |                   |
+        v                   |
+   order.outbox_events      |
+        |                   |
+        +--> Kafka ---------+
+             order-placed
 ```
 
-## Phase 1 Target: Catalog Package Module
+## Deployables
 
-When Phase 1 is implemented, the `app` module will remain a single deployable
-and the first bounded context, Catalog, will be isolated by package:
+| Deployable | Module | Port | Owned schemas | Responsibilities |
+|---|---|---|---|---|
+| `app` | `app` | 8080 | `catalog`, `order`, `inventory` | Catalog reads, Order command (`POST /orders`), outbox relay, Inventory consumer |
+| `order-query` | `order-query` | 8081 | `order_query` | OrderPlaced projection, read model, `GET /orders*` |
+| contracts | `contracts` | — | — | Shared event contracts (`OrderPlacedEvent`) |
+
+## Communication
+
+- Cross-service communication is exclusively Kafka events (`order-placed`).
+- No synchronous inter-service calls (REST/gRPC) across deployables.
+- The transactional outbox in `app` guarantees durable event publication.
+- `order-query` consumes with a dedicated consumer group (`order-query`) and
+  projects into `order_query.order_read_model`.
+
+## Data Ownership
+
+Each deployable owns its persistence:
+
+- `app` owns the `catalog`, `order`, and `inventory` schemas.
+- `order-query` owns the `order_query` schema (read model only).
+- Per-service Flyway migrations and jOOQ codegen with separate history tables.
+
+## Module Boundaries
+
+```text
+app ──────────> contracts
+order-query ──> contracts
+```
+
+`app` and `order-query` must not depend on each other. ArchUnit enforces
+package-level dependency rules within each module.
+
+## Monolith Internal Structure
 
 ```text
 com.hyperscale.commerce
   modules
     catalog
-      domain          # entities, value objects, repository interfaces
-      application     # services, DTOs
-      infrastructure  # repository implementations, row mappers
-      api             # REST controllers
+    order
+    inventory
+    shared
 ```
 
-Allowed dependency direction:
+Each bounded context owns its business rules and persistence; dependency
+direction follows `api -> application -> domain` with infrastructure
+implementing domain interfaces.
 
-```text
-catalog.api -> catalog.application -> catalog.domain
-catalog.infrastructure -> catalog.domain (implements interfaces)
-```
+## References
 
-Each bounded context will own a dedicated PostgreSQL schema. Catalog will own
-the `catalog` schema and its `products` table. ArchUnit tests will enforce the
-package and dependency rules. See ADR-0002 for the full decision record.
+- ADR-0010 — Extract the Order query side as the first service
+- ADR-0011 — Monorepo module and per-service data-ownership model

@@ -111,7 +111,63 @@ Do not claim success without executing verification.
 
 ---
 
-## Step 6 — Inspect the Diff
+## Step 6 — Failure Recording
+If implementation or verification encounters a meaningful failure:
+
+- Stop the current operation.
+- Capture the relevant error.
+- Invoke the record-task-issue skill for the current task.
+- Investigate the failure.
+- Determine the root cause if possible.
+- Implement the smallest appropriate fix.
+- Run verification again.
+- Record the result.
+- Continue only if verification succeeds.
+
+Error history MUST be maintained at:
+
+docs/bootcamp/issues/<TASK-ID>-errors.md
+
+Do not silently retry.
+
+Do not discard failed attempts.
+
+Do not overwrite previous error history.
+
+---
+
+## Step 7 - Bounded Retry
+
+Retries are allowed only when there is a reasonable basis for believing that
+the failure can be resolved.
+
+Do not repeatedly make arbitrary changes.
+
+For the same root cause, track attempts:
+
+```
+Attempt 1 → FAILED
+Attempt 2 → FAILED
+Attempt 3 → FAILED
+```
+
+After three unsuccessful attempts for the same root cause:
+
+- Invoke record-task-issue.
+- Stop implementation.
+- Do not continue modifying code.
+- Report the repeated failure.
+- State that human or architectural review is required.
+
+Never enter an infinite:
+
+fix → test → fail → fix → test → fail
+
+loop.
+
+---
+
+## Step 8 — Inspect the Diff
 
 Review:
 
@@ -120,7 +176,7 @@ git status
 git diff
 ```
 
-## Step 7 — Verify the Task
+## Step 9 — Verify the Task
 
 After implementation:
 
@@ -150,7 +206,7 @@ Do not implement multiple tasks in parallel.
 
 ---
 
-## Step 8 — Select the Next Task
+## Step 10 — Select the Next Task
 
 After a successful verification:
 
@@ -170,7 +226,7 @@ If there is no remaining task in the current phase:
 
 ---
 
-## Step 9 — Stop Conditions
+## Step 11 — Stop Conditions
 
 Stop immediately when:
 
@@ -188,7 +244,7 @@ Do not guess.
 
 ---
 
-## Step 10 — Phase Boundary
+## Step 12 — Phase Boundary
 
 When all tasks in the current phase have been successfully implemented and
 verified:

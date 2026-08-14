@@ -1,6 +1,6 @@
-package com.hyperscale.commerce.modules.order.application
+package com.hyperscale.commerce.orderquery.application
 
-import com.hyperscale.commerce.jooq.order.Tables.ORDER_READ_MODEL
+import com.hyperscale.commerce.orderquery.jooq.order_query.Tables.ORDER_READ_MODEL
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
 import java.time.Instant
@@ -20,7 +20,13 @@ class OrderPlacedProjection(
 ) {
   private val eventsConsumed: Counter =
       meterRegistry.counter(
-          "events_consumed_total", "event_type", EVENT_TYPE, "consumer", CONSUMER_GROUP)
+          "events_consumed_total",
+          "event_type",
+          EVENT_TYPE,
+          "outcome",
+          "processed",
+          "consumer",
+          CONSUMER_GROUP)
 
   @KafkaListener(topics = ["\${app.outbox.topic}"], groupId = CONSUMER_GROUP)
   fun onOrderPlaced(message: String, acknowledgment: Acknowledgment) {

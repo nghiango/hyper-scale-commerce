@@ -1,15 +1,14 @@
-package com.hyperscale.commerce.modules.order
+package com.hyperscale.commerce.orderquery
 
-import com.hyperscale.commerce.config.OutboxProperties
 import java.util.concurrent.TimeUnit
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.kafka.core.KafkaTemplate
-import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.KafkaContainer
@@ -29,14 +28,13 @@ private const val POLL_MILLIS = 500L
 private const val GRACE_SECONDS = 3L
 
 @Testcontainers
-@ActiveProfiles("local")
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 class OrderProjectionIntegrationTest
 @Autowired
 constructor(
     private val kafkaTemplate: KafkaTemplate<String, String>,
     private val jdbcTemplate: JdbcTemplate,
-    private val outboxProperties: OutboxProperties,
+    @param:Value("\${app.outbox.topic}") private val topic: String,
 ) {
 
   companion object {
@@ -61,16 +59,12 @@ constructor(
     val payload =
         """{"version":1,"eventId":"$EVENT_ID","orderId":$ORDER_ID,"status":"$STATUS","createdAt":"$CREATED_AT","items":[{"sku":"$SKU","quantity":$QUANTITY}]}"""
 
-    kafkaTemplate
-        .send(outboxProperties.topic, ORDER_ID.toString(), payload)
-        .get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    kafkaTemplate.send(topic, ORDER_ID.toString(), payload).get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
     awaitReadModelCount(1)
     assertThat(readModelStatus()).isEqualTo(STATUS)
     assertThat(readModelItems()).contains(SKU)
 
-    kafkaTemplate
-        .send(outboxProperties.topic, ORDER_ID.toString(), payload)
-        .get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
+    kafkaTemplate.send(topic, ORDER_ID.toString(), payload).get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
     val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(GRACE_SECONDS)
     while (System.nanoTime() < deadline) {
@@ -95,7 +89,7 @@ constructor(
 
   private fun readModelCount(): Long {
     return jdbcTemplate.queryForObject(
-        "SELECT count(*) FROM \"order\".order_read_model WHERE order_id = ?",
+        "SELECT count(*) FROM order_query.order_read_model WHERE order_id = ?",
         Long::class.java,
         ORDER_ID,
     ) ?: 0L
@@ -103,7 +97,7 @@ constructor(
 
   private fun readModelStatus(): String {
     return jdbcTemplate.queryForObject(
-        "SELECT status FROM \"order\".order_read_model WHERE order_id = ?",
+        "SELECT status FROM order_query.order_read_model WHERE order_id = ?",
         String::class.java,
         ORDER_ID,
     ) ?: error("No read model row for order $ORDER_ID")
@@ -111,7 +105,7 @@ constructor(
 
   private fun readModelItems(): String {
     return jdbcTemplate.queryForObject(
-        "SELECT items::text FROM \"order\".order_read_model WHERE order_id = ?",
+        "SELECT items::text FROM order_query.order_read_model WHERE order_id = ?",
         String::class.java,
         ORDER_ID,
     ) ?: error("No read model row for order $ORDER_ID")
