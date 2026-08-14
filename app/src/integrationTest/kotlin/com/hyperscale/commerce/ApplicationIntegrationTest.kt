@@ -45,7 +45,7 @@ constructor(
             "SELECT max(version) FROM flyway_schema_history WHERE success",
             String::class.java,
         )
-    assertThat(version).isEqualTo("2")
+    assertThat(version).isEqualTo("7")
   }
 
   @Test
@@ -89,6 +89,20 @@ constructor(
 
     assertThat(response.statusCode()).isEqualTo(200)
     assertThat(response.body()).contains("\"openapi\"")
+  }
+
+  @Test
+  fun `event pipeline metrics are exposed`() {
+    val response = get("/actuator/prometheus")
+
+    assertThat(response.statusCode()).isEqualTo(200)
+    assertThat(response.body())
+        .contains(
+            "events_published_total",
+            "events_consumed_total",
+            "events_dlq_total",
+            "kafka_consumer_lag",
+        )
   }
 
   private fun get(path: String): HttpResponse<String> {

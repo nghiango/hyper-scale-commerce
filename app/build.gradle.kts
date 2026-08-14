@@ -5,6 +5,7 @@ plugins {
   id("io.spring.dependency-management") version "1.1.7"
   id("com.diffplug.spotless") version "7.0.2"
   id("io.gitlab.arturbosch.detekt") version "1.23.8"
+  id("org.jooq.jooq-codegen-gradle") version "3.19.28"
 }
 
 group = "com.hyperscale.commerce"
@@ -12,6 +13,44 @@ group = "com.hyperscale.commerce"
 version = "0.0.1-SNAPSHOT"
 
 kotlin { jvmToolchain(21) }
+
+jooq {
+  configuration {
+    generator {
+      database {
+        name = "org.jooq.meta.extensions.ddl.DDLDatabase"
+        properties {
+          property {
+            key = "scripts"
+            value = "src/main/resources/db/migration"
+          }
+          property {
+            key = "sort"
+            value = "flyway"
+          }
+          property {
+            key = "parseIgnoreErrors"
+            value = "true"
+          }
+          property {
+            key = "defaultNameCase"
+            value = "lower"
+          }
+        }
+      }
+      target {
+        packageName = "com.hyperscale.commerce.jooq"
+        directory = "build/generated-sources/jooq"
+      }
+    }
+  }
+}
+
+sourceSets.main { java.srcDir("build/generated-sources/jooq") }
+
+tasks.named("compileJava") { dependsOn("jooqCodegen") }
+
+tasks.named("compileKotlin") { dependsOn("jooqCodegen") }
 
 repositories { mavenCentral() }
 
@@ -27,16 +66,22 @@ configurations["integrationTestRuntimeOnly"].extendsFrom(configurations["testRun
 
 dependencies {
   implementation("org.springframework.boot:spring-boot-starter-web")
+  implementation("org.springframework.boot:spring-boot-starter-jackson")
   implementation("org.springframework.boot:spring-boot-starter-validation")
   implementation("org.springframework.boot:spring-boot-starter-jdbc")
+  implementation("org.springframework.boot:spring-boot-starter-data-jdbc")
+  implementation("org.springframework.boot:spring-boot-starter-jooq")
   implementation("org.springframework.boot:spring-boot-starter-flyway")
   implementation("org.springframework.boot:spring-boot-starter-actuator")
   implementation("io.micrometer:micrometer-registry-prometheus")
   implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9")
+  implementation("org.springframework.kafka:spring-kafka")
   implementation("net.logstash.logback:logstash-logback-encoder:8.0")
   implementation("org.flywaydb:flyway-database-postgresql")
   implementation("org.jetbrains.kotlin:kotlin-reflect")
   runtimeOnly("org.postgresql:postgresql")
+
+  jooqCodegen("org.jooq:jooq-meta-extensions:3.19.28")
 
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
@@ -48,6 +93,7 @@ dependencies {
   "integrationTestImplementation"("org.springframework.boot:spring-boot-testcontainers")
   "integrationTestImplementation"("org.testcontainers:junit-jupiter:1.21.3")
   "integrationTestImplementation"("org.testcontainers:postgresql:1.21.3")
+  "integrationTestImplementation"("org.testcontainers:kafka:1.21.3")
 }
 
 tasks.register<Test>("integrationTest") {
@@ -61,8 +107,12 @@ tasks.register<Test>("integrationTest") {
 
 tasks.check { dependsOn("integrationTest") }
 
+tasks.named<JavaExec>("bootRun") { jvmArgs("-Xms256m", "-Xmx512m", "-XX:+UseG1GC") }
+
 tasks.withType<Test> {
   useJUnitPlatform()
+  maxHeapSize = "1g"
+  jvmArgs("-XX:+UseG1GC")
   testLogging { events("passed", "failed", "skipped") }
 }
 

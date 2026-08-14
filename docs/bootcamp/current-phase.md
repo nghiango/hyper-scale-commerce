@@ -1,8 +1,8 @@
 # Current BootCamp Phase
 
-Phase: 00
+Phase: 05
 
-Name: Engineering Foundation
+Name: Service Extraction
 
 Status: IN_PROGRESS
 
@@ -10,21 +10,30 @@ Allowed technologies:
 
 - Kotlin
 - Spring Boot
-- Gradle
+- Gradle (multi-module builds)
 - PostgreSQL
 - Flyway
-- Docker
+- Docker (service images)
 - Testcontainers
+- ArchUnit (test-only)
+- Kafka
+- spring-kafka
+- Testcontainers Kafka
+- Spring Data JDBC
+- jOOQ
 
 Forbidden until later phases:
 
-- Kafka
 - Redis
 - Kubernetes
-- Microservices
-- CQRS
+- API gateway
+- Service discovery
+- Service mesh
 - Elasticsearch
+- Event sourcing
+- Separate physical databases per service
+- Synchronous inter-service calls (REST/gRPC) across deployables
 
 Next milestone:
 
-Phase 0 Verification
+Phase 05 exit review and evidence
