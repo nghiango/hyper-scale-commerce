@@ -1,0 +1,60 @@
+services:
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.11.0
+    container_name: hyperscale-toxiproxy
+    profiles: ["chaos"]
+    ports:
+      - "8474:8474"   # Toxiproxy Management API
+      - "25432:5432"  # App PostgreSQL Proxy
+      - "25433:5433"  # Order-Query PostgreSQL Proxy
+      - "29093:9092"  # Kafka Proxy
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./performance/chaos/toxiproxy-config.json:/toxiproxy.json:ro
+    command: ["-host=0.0.0.0", "-config=/toxiproxy.json"]
+    healthcheck:
+      test: ["CMD", "/toxiproxy-cli", "list"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+      start_period: 2s
+
+  kafka:
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://toxiproxy:9092,PLAINTEXT_HOST://localhost:9092
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  app:
+    depends_on:
+      toxiproxy:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: toxiproxy
+      POSTGRES_PORT: 5432
+      KAFKA_BOOTSTRAP_SERVERS: toxiproxy:9092
+
+  order-query:
+    depends_on:
+      toxiproxy:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: toxiproxy
+      POSTGRES_PORT: 5433
+      KAFKA_BOOTSTRAP_SERVERS: toxiproxy:9092

@@ -1,5 +1,6 @@
 package com.hyperscale.commerce.config
 
+import com.hyperscale.commerce.config.backoff.ExponentialBackOffWithJitter
 import com.hyperscale.commerce.config.observability.CorrelationIdRecordInterceptor
 import com.hyperscale.commerce.config.observability.KafkaCorrelationProducerInterceptor
 import io.micrometer.core.instrument.Gauge
@@ -32,7 +33,6 @@ import org.springframework.kafka.listener.DeadLetterPublishingRecoverer
 import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.listener.KafkaMessageListenerContainer
 import org.springframework.kafka.listener.MessageListenerContainer
-import org.springframework.util.backoff.FixedBackOff
 
 @Configuration
 @EnableKafka
@@ -108,8 +108,18 @@ class KafkaConfig(
           dlqCounter.increment()
           TopicPartition(record.topic() + "-dlq", record.partition())
         }
-    factory.setCommonErrorHandler(
-        DefaultErrorHandler(deadLetterRecoverer, FixedBackOff(RETRY_BACKOFF_MS, MAX_RETRIES)))
+    val backOff =
+        ExponentialBackOffWithJitter(MAX_RETRIES).apply {
+          initialInterval = INITIAL_INTERVAL_MS
+          multiplier = BACKOFF_MULTIPLIER
+          maxInterval = MAX_INTERVAL_MS
+        }
+    val errorHandler = DefaultErrorHandler(deadLetterRecoverer, backOff)
+    errorHandler.addNotRetryableExceptions(
+        tools.jackson.core.JacksonException::class.java,
+        IllegalArgumentException::class.java,
+    )
+    factory.setCommonErrorHandler(errorHandler)
     return factory
   }
 
@@ -149,7 +159,9 @@ class KafkaConfig(
     const val HEALTH_TOPIC = "health-check"
     const val CONSUMER_GROUP = "inventory"
     const val DLQ_TOPIC = "order-placed-dlq"
-    const val RETRY_BACKOFF_MS = 1000L
+    const val INITIAL_INTERVAL_MS = 200L
+    const val BACKOFF_MULTIPLIER = 2.0
+    const val MAX_INTERVAL_MS = 2000L
     const val MAX_RETRIES = 3L
   }
 }

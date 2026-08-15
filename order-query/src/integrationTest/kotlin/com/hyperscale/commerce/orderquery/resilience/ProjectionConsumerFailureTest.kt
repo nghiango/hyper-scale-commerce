@@ -33,7 +33,7 @@ private const val POISON_PAYLOAD = """{"version":1,"orderId":$POISON_ORDER_ID}""
 private const val SKU = "PERF-SKU-00001"
 private const val TIMEOUT_SECONDS = 30L
 private const val POLL_MILLIS = 500L
-private const val MIN_RETRY_WINDOW_MS = 2500L
+private const val MIN_RETRY_WINDOW_MS = 300L
 
 @Testcontainers
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)

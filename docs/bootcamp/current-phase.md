@@ -1,19 +1,20 @@
 # Current BootCamp Phase
 
-Phase: 08
+Phase: 10
 
-Name: Load Engineering
+Name: Production Readiness, Operational Hardening & Final Certification
 
 Status: APPROVED
 
 Allowed technologies:
 
 - Kotlin
-- Spring Boot
+- Spring Boot (Graceful Shutdown, Actuator, Security)
 - Gradle (multi-module builds)
-- PostgreSQL
+- PostgreSQL (HikariCP pool management)
 - Flyway
 - Docker (service images)
+- Docker Compose
 - Testcontainers
 - ArchUnit (test-only)
 - Kafka
@@ -25,23 +26,20 @@ Allowed technologies:
 - Brave
 - SLF4J MDC
 - k6 (test-only pinned container image)
-- POSIX shell and existing HTTP/Docker interfaces (test-only orchestration)
+- POSIX shell and Docker Engine CLI (test-only)
+- Toxiproxy (test-only, digest-pinned)
+- Prometheus Alerting Rule definitions (configuration-only)
 
 Forbidden until later phases:
 
-- Redis
-- Kubernetes
-- API gateway
-- Service discovery
+- Kubernetes (deferred to cloud deployment)
 - Service mesh
-- Elasticsearch
+- Autoscaling / dynamic pod replicas
+- Cloud-managed PaaS infrastructure
+- Elasticsearch / OpenSearch
 - Event sourcing
-- Separate physical databases per service
-- Synchronous inter-service calls (REST/gRPC) across deployables
-- Prometheus/Grafana servers, central APM, and log aggregation
-- Distributed load-generator infrastructure
-- Network-partition and randomized fault injection
+- Microservice sprawl / unnecessary new deployables
 
 Next milestone:
 
-P8-01 — ADR: load-test strategy and qualification model
+P10-01 — ADR-0016: Production Hardening, Security, and Lifecycle Strategy

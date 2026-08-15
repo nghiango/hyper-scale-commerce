@@ -1,0 +1,20 @@
+[
+  {
+    "name": "app_postgres",
+    "listen": "0.0.0.0:5432",
+    "upstream": "postgres:5432",
+    "enabled": true
+  },
+  {
+    "name": "orderquery_postgres",
+    "listen": "0.0.0.0:5433",
+    "upstream": "postgres:5432",
+    "enabled": true
+  },
+  {
+    "name": "kafka",
+    "listen": "0.0.0.0:9092",
+    "upstream": "kafka:9092",
+    "enabled": true
+  }
+]

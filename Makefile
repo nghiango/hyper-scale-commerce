@@ -33,3 +33,19 @@ load-verify: ## Run 10,000 concurrent VU qualification scenario
 
 load-spike: ## Run 5x traffic spike and recovery qualification scenario
 	bash performance/scripts/run-scenario.sh spike-5x
+
+chaos-up: ## Build and start services with Toxiproxy chaos overlay
+	./gradlew :app:bootJar :order-query:bootJar
+	docker compose -f compose.yaml -f performance/compose.chaos.yml --profile services --profile chaos up -d --build
+
+chaos-down: ## Stop chaos environment and remove containers
+	docker compose -f compose.yaml -f performance/compose.chaos.yml --profile services --profile chaos down
+
+chaos-preflight: ## Run preflight safety and proxy checks
+	bash performance/chaos/preflight-chaos.sh
+
+chaos-clean: ## Reset all toxics and re-enable all proxies
+	bash performance/chaos/cleanup-chaos.sh
+
+chaos-smoke: ## Run automated chaos smoke test with fault injection and data reconciliation
+	bash performance/chaos/run-chaos.sh smoke
