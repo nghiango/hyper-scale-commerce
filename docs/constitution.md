@@ -68,20 +68,26 @@ Database access must respect bounded-context ownership.
 
 ---
 
-# 5. Distributed Systems Rules
+## 5. Distributed Systems Rules
 
 Whenever asynchronous processing is introduced:
 
-- messages must be durable
-- consumers must be idempotent
-- failures must be observable
-- retries must be bounded
-- poison messages must be handled
-- eventual consistency must be explicit
+- messages must be durable; delivery semantics must be explicit
+- consumers must be idempotent and tolerate duplicate delivery
+- message ordering requirements must be explicit and documented
+- retries must be bounded and use exponential backoff with jitter
+- retryable and non-retryable failures must be explicit
+- poison messages must be routed to a dead-letter queue and handled
+- message replay and recovery must be possible without corrupting state
+- timeouts must be explicit for every external dependency
+- eventual consistency must be explicit and state reconciliation considered
+- message and schema versions must remain backward-compatible across deployments
+- correlation and causation IDs must be propagated across services
+- failures must be observable through metrics and logs
 
 ---
 
-# 6. Performance Rules
+## 6. Performance Rules
 
 Every optimization must answer:
 
@@ -93,7 +99,7 @@ Every optimization must answer:
 
 ---
 
-# 7. Reliability Rules
+## 7. Reliability Rules
 
 Critical operations must define:
 
@@ -102,6 +108,18 @@ Critical operations must define:
 - idempotency strategy
 - failure behavior
 - recovery behavior
+- which errors are retryable and which are not
+- graceful degradation when a dependency is unavailable
+
+Resilient systems also apply:
+
+- circuit breakers when cascading failures are possible
+- bulkheads / resource isolation to contain failures
+- backpressure, rate limiting, and load shedding to protect capacity
+- explicit eventual consistency and state reconciliation procedures
+- concurrency control and distributed lock safety where needed
+- end-to-end distributed tracing, correlation IDs, and operational observability
+- failure recovery runbooks for the supported failure modes
 
 ---
 

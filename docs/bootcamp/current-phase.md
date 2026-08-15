@@ -4,7 +4,7 @@ Phase: 06
 
 Name: Resilience Engineering
 
-Status: PLANNED
+Status: IN_PROGRESS
 
 Allowed technologies:
 
@@ -36,4 +36,4 @@ Forbidden until later phases:
 
 Next milestone:
 
-Phase 06 plan creation
+P6-04 — PostgreSQL outage experiments

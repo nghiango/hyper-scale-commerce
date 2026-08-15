@@ -88,9 +88,20 @@ class KafkaConfig {
     factory.containerProperties.ackMode = ContainerProperties.AckMode.MANUAL_IMMEDIATE
 
     val dlqCounter = meterRegistry.counter("events_dlq_total", "topic", DLQ_TOPIC)
+    val failedConsumedCounter =
+        meterRegistry.counter(
+            "events_consumed_total",
+            "event_type",
+            EVENT_TYPE,
+            "outcome",
+            "failed",
+            "consumer",
+            CONSUMER_GROUP,
+        )
     val deadLetterRecoverer =
         DeadLetterPublishingRecoverer(kafkaTemplate) { record, _ ->
           dlqCounter.increment()
+          failedConsumedCounter.increment()
           TopicPartition(record.topic() + "-dlq", record.partition())
         }
     factory.setCommonErrorHandler(
@@ -134,6 +145,7 @@ class KafkaConfig {
     const val HEALTH_TOPIC = "health-check"
     const val CONSUMER_GROUP = "order-query"
     const val DLQ_TOPIC = "order-placed-dlq"
+    const val EVENT_TYPE = "OrderPlaced"
     const val RETRY_BACKOFF_MS = 1000L
     const val MAX_RETRIES = 3L
   }

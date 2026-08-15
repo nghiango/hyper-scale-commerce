@@ -1,6 +1,6 @@
 # Phase 06 — Resilience Engineering
 
-Status: **DRAFT** (pending approval)
+Status: **APPROVED**
 
 This plan was produced by inspecting the repository and the documents:
 
