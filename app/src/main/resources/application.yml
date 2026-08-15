@@ -10,8 +10,8 @@ spring:
     username: ${POSTGRES_USER:hyperscale}
     password: ${POSTGRES_PASSWORD:hyperscale}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 30
+      minimum-idle: 10
       connection-timeout: 5000
       idle-timeout: 600000
       max-lifetime: 1800000
@@ -19,6 +19,11 @@ spring:
     enabled: true
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      auto-offset-reset: earliest
+      max-poll-records: 500
+    listener:
+      concurrency: 3
 
 server:
   port: ${SERVER_PORT:8080}
@@ -39,8 +44,8 @@ app:
   name: ${APP_NAME:hyper-scale-commerce}
   outbox:
     topic: order-placed
-    relay-interval-ms: 1000
-    claim-limit: 100
+    relay-interval-ms: 100
+    claim-limit: 500
 
 management:
   endpoints:

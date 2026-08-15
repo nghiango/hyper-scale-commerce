@@ -1,10 +1,10 @@
 # Current BootCamp Phase
 
-Phase: 07
+Phase: 08
 
-Name: Observability
+Name: Load Engineering
 
-Status: COMPLETE
+Status: APPROVED
 
 Allowed technologies:
 
@@ -24,6 +24,8 @@ Allowed technologies:
 - Micrometer Tracing
 - Brave
 - SLF4J MDC
+- k6 (test-only pinned container image)
+- POSIX shell and existing HTTP/Docker interfaces (test-only orchestration)
 
 Forbidden until later phases:
 
@@ -36,7 +38,10 @@ Forbidden until later phases:
 - Event sourcing
 - Separate physical databases per service
 - Synchronous inter-service calls (REST/gRPC) across deployables
+- Prometheus/Grafana servers, central APM, and log aggregation
+- Distributed load-generator infrastructure
+- Network-partition and randomized fault injection
 
 Next milestone:
 
-P7-01 — ADR: observability strategy
+P8-01 — ADR: load-test strategy and qualification model

@@ -1,0 +1,13 @@
+services:
+  k6:
+    image: grafana/k6:0.57.0@sha256:70af91f86cd8e142e0544a4edaf79835a80033f71974b92edd5ac36fd4442a7b
+    profiles: ["load"]
+    container_name: hyperscale-k6
+    environment:
+      - APP_BASE_URL=${APP_BASE_URL:-http://app:8080}
+      - ORDER_QUERY_BASE_URL=${ORDER_QUERY_BASE_URL:-http://order-query:8081}
+      - SCENARIO=${SCENARIO:-smoke}
+      - PRNG_SEED=${PRNG_SEED:-42}
+    volumes:
+      - ./performance/k6:/scripts:ro
+      - ./build/performance-results:/results

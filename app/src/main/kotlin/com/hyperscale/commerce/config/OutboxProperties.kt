@@ -9,6 +9,6 @@ import org.springframework.validation.annotation.Validated
 @ConfigurationProperties(prefix = "app.outbox")
 data class OutboxProperties(
     @field:NotBlank val topic: String,
-    @field:Positive val relayIntervalMs: Long = 1000,
-    @field:Positive val claimLimit: Int = 100,
+    @field:Positive val relayIntervalMs: Long = 100,
+    @field:Positive val claimLimit: Int = 500,
 )

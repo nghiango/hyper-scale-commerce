@@ -51,6 +51,14 @@ class JooqOutboxRepository(private val dsl: DSLContext) : OutboxRepository {
         .execute()
   }
 
+  override fun markPublished(ids: Collection<Long>) {
+    if (ids.isEmpty()) return
+    dsl.update(OUTBOX_EVENTS)
+        .set(OUTBOX_EVENTS.PUBLISHED_AT, DSL.currentOffsetDateTime())
+        .where(OUTBOX_EVENTS.ID.`in`(ids))
+        .execute()
+  }
+
   override fun oldestUnpublishedAgeSeconds(): Double {
     val ageSeconds =
         DSL.field("extract(epoch from (now() - {0}))", Double::class.java, OUTBOX_EVENTS.CREATED_AT)

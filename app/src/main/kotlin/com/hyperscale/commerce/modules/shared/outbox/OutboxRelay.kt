@@ -29,17 +29,25 @@ class OutboxRelay(
   private val eventsPublished: Counter =
       meterRegistry.counter("events_published_total", "topic", topic)
 
-  @Scheduled(fixedDelayString = "\${app.outbox.relay-interval-ms:1000}")
+  @Scheduled(fixedDelayString = "\${app.outbox.relay-interval-ms:100}")
   fun publishDueEvents() {
-    outboxRepository.claimDue(claimLimit).forEach { event ->
+    var hasMore = true
+    while (hasMore) {
+      val dueEvents = outboxRepository.claimDue(claimLimit)
+      if (dueEvents.isEmpty()) {
+        hasMore = false
+      } else {
+        val keepGoing = publishBatch(dueEvents)
+        hasMore = keepGoing && (dueEvents.size >= claimLimit)
+      }
+    }
+  }
+
+  private fun publishBatch(dueEvents: List<OutboxEvent>): Boolean {
+    val publishedIds = ArrayList<Long>(dueEvents.size)
+    var continueProcessing = true
+    for (event in dueEvents) {
       val eventContext = parseTraceContext(event.payload)
-      logger.info(
-          "Preparing to publish outbox event {} with traceId={} parentSpanId={} correlationId={}",
-          event.id,
-          eventContext.traceId,
-          eventContext.parentSpanId,
-          eventContext.correlationId,
-      )
       val span = startOutboxSpan(eventContext)
       val scope = tracer.withSpan(span)
       MDC.put(
@@ -51,7 +59,7 @@ class OutboxRelay(
         kafkaTemplate
             .send(topic, event.aggregateId, event.payload)
             .get(PUBLISH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        outboxRepository.markPublished(event.id)
+        publishedIds.add(event.id)
         eventsPublished.increment()
       } catch (exception: KafkaException) {
         logger.warn("Failed to publish outbox event {} to topic {}", event.id, topic, exception)
@@ -61,6 +69,8 @@ class OutboxRelay(
         logger.warn("Timed out publishing outbox event {} to topic {}", event.id, topic, exception)
       } catch (exception: InterruptedException) {
         Thread.currentThread().interrupt()
+        continueProcessing = false
+        break
       } finally {
         MDC.remove(CorrelationIdFilter.CORRELATION_ID_MDC_KEY)
         MDC.remove(CorrelationIdFilter.TRACE_ID_MDC_KEY)
@@ -69,6 +79,10 @@ class OutboxRelay(
         span.end()
       }
     }
+    if (publishedIds.isNotEmpty()) {
+      outboxRepository.markPublished(publishedIds)
+    }
+    return continueProcessing
   }
 
   private fun parseTraceContext(payload: String): TraceContextCarrier {

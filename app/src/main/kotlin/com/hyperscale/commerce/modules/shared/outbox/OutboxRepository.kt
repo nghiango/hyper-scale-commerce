@@ -8,5 +8,7 @@ interface OutboxRepository {
 
   fun markPublished(id: Long)
 
+  fun markPublished(ids: Collection<Long>)
+
   fun oldestUnpublishedAgeSeconds(): Double
 }

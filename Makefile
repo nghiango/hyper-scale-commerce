@@ -1,4 +1,4 @@
-.PHONY: up down services test verify run clean
+.PHONY: up down services test verify run clean load-smoke load-baseline load-verify load-spike
 
 up: ## Start local infrastructure (PostgreSQL)
 	docker compose up -d
@@ -21,3 +21,15 @@ run: ## Run the application locally (human-readable logs)
 
 clean: ## Remove build outputs
 	./gradlew clean
+
+load-smoke: ## Run short 30-second load smoke verification with data reconciliation
+	bash performance/scripts/run-scenario.sh smoke
+
+load-baseline: ## Run stepped saturation baseline scenario
+	bash performance/scripts/run-scenario.sh baseline
+
+load-verify: ## Run 10,000 concurrent VU qualification scenario
+	bash performance/scripts/run-scenario.sh qualification-10k
+
+load-spike: ## Run 5x traffic spike and recovery qualification scenario
+	bash performance/scripts/run-scenario.sh spike-5x
