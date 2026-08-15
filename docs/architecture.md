@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Phase 5 — Service Extraction (complete; Phase 6 Resilience Engineering planned)
+Phase 6 — Resilience Engineering (complete; Phase 7 Observability planned)
 
 ## Target Architecture
 

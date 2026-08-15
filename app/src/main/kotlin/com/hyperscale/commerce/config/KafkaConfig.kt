@@ -1,7 +1,11 @@
 package com.hyperscale.commerce.config
 
+import com.hyperscale.commerce.config.observability.CorrelationIdRecordInterceptor
+import com.hyperscale.commerce.config.observability.KafkaCorrelationProducerInterceptor
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.observation.ObservationRegistry
+import io.micrometer.tracing.Tracer
 import java.util.function.Supplier
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -32,7 +36,10 @@ import org.springframework.util.backoff.FixedBackOff
 
 @Configuration
 @EnableKafka
-class KafkaConfig {
+class KafkaConfig(
+    private val observationRegistry: ObservationRegistry,
+    private val tracer: Tracer,
+) {
 
   @Bean
   fun kafkaProducerFactory(
@@ -43,13 +50,20 @@ class KafkaConfig {
     props[ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
     props[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
     props[ProducerConfig.MAX_BLOCK_MS_CONFIG] = MAX_BLOCK_MS
+    props[ProducerConfig.INTERCEPTOR_CLASSES_CONFIG] =
+        listOf(KafkaCorrelationProducerInterceptor::class.java.name)
     return DefaultKafkaProducerFactory(props)
   }
 
   @Bean
   fun kafkaTemplate(
       producerFactory: ProducerFactory<String, String>,
-  ): KafkaTemplate<String, String> = KafkaTemplate(producerFactory)
+  ): KafkaTemplate<String, String> {
+    val template = KafkaTemplate(producerFactory)
+    template.setObservationEnabled(true)
+    template.setObservationRegistry(observationRegistry)
+    return template
+  }
 
   @Bean
   fun kafkaHealthIndicator(
@@ -85,6 +99,7 @@ class KafkaConfig {
   ): ConcurrentKafkaListenerContainerFactory<String, String> {
     val factory = ConcurrentKafkaListenerContainerFactory<String, String>()
     factory.setConsumerFactory(consumerFactory)
+    factory.setRecordInterceptor(CorrelationIdRecordInterceptor(observationRegistry, tracer))
     factory.containerProperties.ackMode = ContainerProperties.AckMode.MANUAL_IMMEDIATE
 
     val dlqCounter = meterRegistry.counter("events_dlq_total", "topic", DLQ_TOPIC)

@@ -1,10 +1,10 @@
 # Current BootCamp Phase
 
-Phase: 06
+Phase: 07
 
-Name: Resilience Engineering
+Name: Observability
 
-Status: IN_PROGRESS
+Status: COMPLETE
 
 Allowed technologies:
 
@@ -21,6 +21,9 @@ Allowed technologies:
 - Testcontainers Kafka
 - Spring Data JDBC
 - jOOQ
+- Micrometer Tracing
+- Brave
+- SLF4J MDC
 
 Forbidden until later phases:
 
@@ -36,4 +39,4 @@ Forbidden until later phases:
 
 Next milestone:
 
-P6-04 — PostgreSQL outage experiments
+P7-01 — ADR: observability strategy
