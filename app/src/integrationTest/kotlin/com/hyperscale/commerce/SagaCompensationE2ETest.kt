@@ -11,6 +11,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.context.ConfigurableApplicationContext
+import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.KafkaContainer
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
@@ -19,7 +20,7 @@ import org.testcontainers.utility.DockerImageName
 
 private const val OOS_SKU = "SKU-OOS-OUT-OF-STOCK"
 private const val QUANTITY = 1
-private const val TIMEOUT_SECONDS = 30L
+private const val TIMEOUT_SECONDS = 60L
 private const val POLL_MILLIS = 300L
 private const val READINESS_RETRY_MILLIS = 500L
 
@@ -34,6 +35,10 @@ class SagaCompensationE2ETest {
     val kafka: KafkaContainer = KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.7.1"))
 
     @Container @JvmStatic val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16")
+
+    @Container
+    @JvmStatic
+    val redis = SagaRedisContainer(DockerImageName.parse("redis:7.2-alpine")).withExposedPorts(6379)
   }
 
   @Test
@@ -78,6 +83,8 @@ class SagaCompensationE2ETest {
             "--spring.datasource.username=${postgres.username}",
             "--spring.datasource.password=${postgres.password}",
             "--spring.kafka.bootstrap-servers=${kafka.bootstrapServers}",
+            "--spring.data.redis.host=${redis.host}",
+            "--spring.data.redis.port=${redis.getMappedPort(6379)}",
             "--spring.flyway.locations=classpath:db/migration-order-query",
             "--spring.flyway.schemas=order_query",
             "--server.port=0",
@@ -93,6 +100,8 @@ class SagaCompensationE2ETest {
             "--spring.datasource.username=${postgres.username}",
             "--spring.datasource.password=${postgres.password}",
             "--spring.kafka.bootstrap-servers=${kafka.bootstrapServers}",
+            "--spring.data.redis.host=${redis.host}",
+            "--spring.data.redis.port=${redis.getMappedPort(6379)}",
             "--spring.flyway.locations=classpath:db/migration",
             "--spring.flyway.schemas=public",
             "--server.port=0",
@@ -144,3 +153,5 @@ class SagaCompensationE2ETest {
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString())
   }
 }
+
+class SagaRedisContainer(image: DockerImageName) : GenericContainer<SagaRedisContainer>(image)

@@ -54,6 +54,12 @@ constructor(
         """
         INSERT INTO catalog.products (sku, name, description, price, availability, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, now(), now())
+        ON CONFLICT (sku) DO UPDATE SET
+          name = EXCLUDED.name,
+          description = EXCLUDED.description,
+          price = EXCLUDED.price,
+          availability = EXCLUDED.availability,
+          updated_at = now()
         """
             .trimIndent(),
         "TEST-SKU",
@@ -102,6 +108,9 @@ constructor(
             "events_consumed_total",
             "events_dlq_total",
             "kafka_consumer_lag",
+            "hyperscale_cache_gets_total",
+            "datasource_connections_active",
+            "postgres_replication_lag_seconds",
         )
   }
 

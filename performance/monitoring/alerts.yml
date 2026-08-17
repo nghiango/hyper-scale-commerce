@@ -115,3 +115,72 @@ groups:
           summary: "HikariCP detected unclosed connection held past leak threshold"
           description: "A connection was held longer than 5000ms without being closed/returned to the pool."
           runbook_url: "docs/runbooks/database-pool-exhaustion.md"
+
+      # =========================================================================
+      # 5. Database High Availability & Replication Alerts
+      # =========================================================================
+      - alert: PostgreSQLNoLeader
+        expr: count(patroni_is_leader == 1) == 0
+        for: 15s
+        labels:
+          severity: critical
+          component: postgres-patroni
+        annotations:
+          summary: "No active PostgreSQL Patroni primary leader found"
+          description: "No node currently holds the Patroni primary leader lease in etcd."
+          runbook_url: "docs/runbooks/postgresql-ha-failover.md"
+
+      - alert: PostgreSQLSplitBrain
+        expr: count(patroni_is_leader == 1) > 1
+        for: 0s
+        labels:
+          severity: critical
+          component: postgres-patroni
+        annotations:
+          summary: "CRITICAL: Multiple PostgreSQL primaries detected (Split Brain)"
+          description: "More than one PostgreSQL node reports holding the primary lease!"
+          runbook_url: "docs/runbooks/postgresql-ha-failover.md"
+
+      - alert: PostgreSQLSyncStandbyMissing
+        expr: sum(pg_stat_replication_sync_state{sync_state="sync"}) == 0
+        for: 15s
+        labels:
+          severity: critical
+          component: postgres-replication
+        annotations:
+          summary: "Synchronous PostgreSQL standby replica missing"
+          description: "Primary does not have a confirmed synchronous standby replica in pg_stat_replication."
+          runbook_url: "docs/runbooks/postgresql-ha-failover.md"
+
+      - alert: PostgreSQLEtcdQuorumDegraded
+        expr: sum(etcd_server_has_leader) < 2
+        for: 10s
+        labels:
+          severity: critical
+          component: etcd-dcs
+        annotations:
+          summary: "etcd Distributed Configuration Store quorum is degraded"
+          description: "Less than 2 of 3 etcd DCS members are responding with a healthy leader."
+          runbook_url: "docs/runbooks/postgresql-ha-failover.md"
+
+      - alert: PostgreSQLReplicationLagHigh
+        expr: pg_stat_replication_replay_lag_bytes > 52428800
+        for: 1m
+        labels:
+          severity: warning
+          component: postgres-replication
+        annotations:
+          summary: "PostgreSQL standby replication lag exceeds 50MB"
+          description: "Standby replay lag is currently {{ $value | humanize1024 }} bytes."
+          runbook_url: "docs/runbooks/postgresql-ha-failover.md"
+
+      - alert: PostgreSQLWalArchiveFailure
+        expr: increase(pg_stat_archiver_failed_count[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: postgres-backup
+        annotations:
+          summary: "PostgreSQL WAL archive failures detected"
+          description: "PostgreSQL WAL archiver failed to archive {{ $value }} WAL file(s)."
+          runbook_url: "docs/runbooks/postgresql-backup-and-pitr.md"

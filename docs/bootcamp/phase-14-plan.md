@@ -2,7 +2,7 @@
 
 **Phase:** Phase 14 — Multi-Replica Runtime & Kafka High Availability
 
-**Status:** PROPOSED — NOT APPROVED FOR IMPLEMENTATION
+**Status:** APPROVED — COMPLETED
 
 **Date:** 2026-08-17
 
@@ -375,7 +375,7 @@ requires separate approval.
 
 ## 18. Ordered Implementation Tasks
 
-### P14-01 — ADR-0023 and HA Qualification Contract
+### P14-01 — ADR-0023 and HA Qualification Contract (COMPLETED)
 
 - **Objective:** Approve the precise multi-replica and Kafka HA architecture,
   failure domains, workload, durability contract, and claim boundaries before
@@ -411,7 +411,7 @@ requires separate approval.
 - **Out of scope:** Compose changes, application changes, broker deployment, or
   executing load/failure tests.
 
-### P14-02 — Deterministic Three-Broker Kafka HA Topology
+### P14-02 — Deterministic Three-Broker Kafka HA Topology (COMPLETED)
 
 - **Objective:** Provide a reproducible three-node Kafka KRaft quorum with
   explicit durable topic configuration and preflight validation.
@@ -448,7 +448,7 @@ requires separate approval.
 - **Out of scope:** Application replicas, PostgreSQL replication, cross-region
   Kafka, TLS/SASL, or performance certification.
 
-### P14-03 — Multi-Replica Services and Health-Aware Ingress
+### P14-03 — Multi-Replica Services and Health-Aware Ingress (COMPLETED)
 
 - **Objective:** Run at least two replicas of `app` and `order-query` behind a
   health-aware HAProxy ingress with safe forwarding and graceful drain.
@@ -485,7 +485,7 @@ requires separate approval.
 - **Out of scope:** Ingress HA, Kubernetes Services/Ingress, autoscaling,
   application-domain changes, or Kafka broker qualification.
 
-### P14-04 — Multi-Replica Event Processing and Ordering Qualification
+### P14-04 — Multi-Replica Event Processing and Ordering Qualification (COMPLETED)
 
 - **Objective:** Verify concurrent outbox workers, partitioned consumers,
   rebalances, cache behavior, and aggregate ordering across real service
@@ -524,7 +524,7 @@ requires separate approval.
 - **Out of scope:** New event types, business workflow changes, exactly-once
   transactions, or database HA.
 
-### P14-05 — Topology-Wide Client Rate-Limit Enforcement
+### P14-05 — Topology-Wide Client Rate-Limit Enforcement (COMPLETED)
 
 - **Objective:** Prevent normal multi-replica routing from multiplying the
   documented client quota while preserving Phase 13 defense-in-depth behavior.
@@ -561,7 +561,7 @@ requires separate approval.
 - **Out of scope:** Redis, globally replicated quotas, multi-ingress consistency,
   billing quotas, or user-account authorization.
 
-### P14-06 — Broker and Replica Failure Experiment Harness
+### P14-06 — Broker and Replica Failure Experiment Harness (COMPLETED)
 
 - **Objective:** Extend the safe chaos harness with deterministic application
   replica and Kafka broker/leader failure scenarios under sustained traffic.
@@ -600,7 +600,7 @@ requires separate approval.
 - **Out of scope:** Random production chaos, host/kernel faults, disk corruption,
   clock skew, multi-zone faults, or automatic orchestrator healing.
 
-### P14-07 — HA Load, Recovery, and Availability Qualification
+### P14-07 — HA Load, Recovery, and Availability Qualification (COMPLETED)
 
 - **Objective:** Measure the multi-replica topology under nominal load, the
   approved 5x spike, replica loss, and single-broker loss while preserving
@@ -641,7 +641,7 @@ requires separate approval.
   evidence proves it necessary, autoscaling, or extrapolation beyond the tested
   environment.
 
-### P14-08 — Runbooks, Evidence Dossier, and Phase Review
+### P14-08 — Runbooks, Evidence Dossier, and Phase Review (COMPLETED)
 
 - **Objective:** Consolidate evidence, update operational guidance and living
   architecture documents, and execute formal Phase 14 verification and review.

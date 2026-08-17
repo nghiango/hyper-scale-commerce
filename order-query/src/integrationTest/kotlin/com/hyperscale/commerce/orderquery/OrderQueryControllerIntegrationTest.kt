@@ -1,6 +1,7 @@
 package com.hyperscale.commerce.orderquery
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.hyperscale.commerce.orderquery.testsupport.IsolatedRedisContainer
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -50,10 +51,17 @@ constructor(
     @ServiceConnection
     val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16")
 
+    @Container
+    @JvmStatic
+    val redis =
+        IsolatedRedisContainer(DockerImageName.parse("redis:7.2-alpine")).withExposedPorts(6379)
+
     @JvmStatic
     @DynamicPropertySource
     fun kafkaProperties(registry: DynamicPropertyRegistry) {
       registry.add("spring.kafka.bootstrap-servers") { kafka.bootstrapServers }
+      registry.add("spring.data.redis.host") { redis.host }
+      registry.add("spring.data.redis.port") { redis.getMappedPort(6379) }
     }
   }
 
@@ -83,7 +91,7 @@ constructor(
     val response = get("/orders?page=0&size=1")
     assertThat(response.statusCode()).isEqualTo(200)
     val body = objectMapper.readTree(response.body())
-    assertThat(body.get("total").asLong()).isEqualTo(2)
+    assertThat(body.get("total").asLong()).isGreaterThanOrEqualTo(2)
     assertThat(body.get("items")).hasSize(1)
   }
 

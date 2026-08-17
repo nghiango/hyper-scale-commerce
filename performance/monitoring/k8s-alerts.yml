@@ -1,0 +1,88 @@
+groups:
+  - name: hyperscale-commerce-k8s-alerts
+    rules:
+      # =========================================================================
+      # 1. Pod & Workload Health Alerts
+      # =========================================================================
+      - alert: K8sPodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[5m]) * 60 > 0.5
+        for: 2m
+        labels:
+          severity: critical
+          component: k8s-workload
+        annotations:
+          summary: "Pod is crash looping"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted repeatedly."
+          runbook_url: "docs/runbooks/kubernetes-workload-operations.md"
+
+      - alert: K8sPodNotReady
+        expr: kube_pod_status_phase{phase=~"Pending|Unknown"} == 1
+        for: 3m
+        labels:
+          severity: warning
+          component: k8s-workload
+        annotations:
+          summary: "Pod is not in Running/Ready state"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} is in state {{ $labels.phase }}."
+          runbook_url: "docs/runbooks/kubernetes-workload-operations.md"
+
+      - alert: K8sContainerOOMKilled
+        expr: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+        for: 0m
+        labels:
+          severity: critical
+          component: k8s-resources
+        annotations:
+          summary: "Container killed by Out-Of-Memory (OOM)"
+          description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was killed due to memory limit breach."
+          runbook_url: "docs/runbooks/kubernetes-workload-operations.md"
+
+      # =========================================================================
+      # 2. Node & Quorum Reliability Alerts
+      # =========================================================================
+      - alert: K8sNodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: k8s-nodes
+        annotations:
+          summary: "Kubernetes node is NotReady"
+          description: "Node {{ $labels.node }} is reporting unready condition."
+          runbook_url: "docs/runbooks/kubernetes-workload-operations.md"
+
+      - alert: K8sPodDisruptionBudgetAtRisk
+        expr: kube_poddisruptionbudget_status_pod_disruptions_allowed == 0
+        for: 1m
+        labels:
+          severity: warning
+          component: k8s-disruption
+        annotations:
+          summary: "PodDisruptionBudget has 0 allowable disruptions"
+          description: "PDB {{ $labels.poddisruptionbudget }} cannot tolerate further pod disruptions without breaching quorum."
+          runbook_url: "docs/runbooks/kubernetes-workload-operations.md"
+
+      # =========================================================================
+      # 3. Elasticity & Ingress Alerts
+      # =========================================================================
+      - alert: K8sHpaMaxedOut
+        expr: kube_horizontalpodautoscaler_status_current_replicas == kube_horizontalpodautoscaler_spec_max_replicas
+        for: 5m
+        labels:
+          severity: warning
+          component: k8s-autoscaling
+        annotations:
+          summary: "HPA reached maximum allowed replicas"
+          description: "HPA {{ $labels.horizontalpodautoscaler }} is running at max capacity ({{ $value }} replicas)."
+          runbook_url: "docs/runbooks/kubernetes-workload-operations.md"
+
+      - alert: K8sIngressPeerSyncFailure
+        expr: haproxy_peers_connected == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: k8s-ingress
+        annotations:
+          summary: "HAProxy ingress peer synchronization disconnected"
+          description: "HAProxy ingress pods are failing to synchronize stick-table rate-limit state."
+          runbook_url: "docs/runbooks/ha-ingress-operations.md"

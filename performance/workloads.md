@@ -199,3 +199,42 @@ The reconciliation script asserts:
    $$\text{DLQ Message Count} \equiv 0$$
 
 If any count mismatch, unhandled outbox row, duplicate read-model record, or DLQ message is detected, the run is flagged as a **DATA INTEGRITY FAILURE** regardless of latency or throughput results.
+
+---
+
+## 8. Phase 14 High Availability & Failure Recovery Scenarios
+
+In accordance with `docs/adr/0023-multi-replica-runtime-and-kafka-ha.md` and `docs/bootcamp/phase-14-plan.md`, Phase 14 introduces multi-replica service topologies and a 3-broker Kafka KRaft cluster. The following profiles govern HA and failure recovery qualification:
+
+### Profile 5: `ha-baseline` (Multi-Replica Ingress No-Fault Steady State)
+- **Topology:** $\ge 2$ `app` replicas, $\ge 2$ `order-query` replicas, 1 HAProxy ingress, 3 Kafka KRaft nodes, 1 PostgreSQL primary.
+- **Executor:** `ramping-vus` (Closed Concurrency Model).
+- **Workload:** Standard 80/10/10 mix through HAProxy ports 8080 and 8081.
+- **Pass/Fail Thresholds:**
+  - Critical API latency: p95 $< 200\text{ ms}$.
+  - Ingress proxy overhead: p95 $< 5\text{ ms}$ relative to direct service control.
+  - HTTP success rate: $\ge 99.9\%$.
+  - Load distribution: All registered healthy backends receive $\ge 20\%$ of requests.
+
+### Profile 6: `ha-replica-failover` (Stateless Instance Termination under Load)
+- **Target:** 1 `app` or `order-query` replica terminated via `SIGKILL` during active load.
+- **Hypothesis:** Surviving replica(s) absorb incoming traffic; HAProxy removes dead backend within health check deadline ($\le 5\text{s}$).
+- **Pass/Fail Thresholds:**
+  - Ingress health convergence: Dead backend removed within $\le 5\text{s}$.
+  - Latency recovery: Critical API p95 recovers $< 200\text{ ms}$ within 30 seconds of failure.
+  - Zero unhandled 5xx on surviving backends.
+  - Data integrity: 100% reconciliation after drain.
+
+### Profile 7: `ha-broker-failover` (Kafka Leader Broker Termination under Load)
+- **Target:** 1 active Kafka partition leader broker terminated via `SIGKILL` during active `POST /orders` stream.
+- **Hypothesis:** KRaft quorum (2 of 3) elects new partition leaders; producers with `acks=all` and `min.insync.replicas=2` continue without acknowledged data loss.
+- **Pass/Fail Thresholds:**
+  - Leader election & metadata convergence: $\le 5\text{s}$.
+  - Outbox publication recovery: Lag drains back to steady-state within $\le 60\text{s}$ of cluster stabilization.
+  - DLQ count: $= 0$ unexpected errors.
+  - Data integrity: 100% reconciliation.
+
+### Minimum Environment Specification
+- **CPU:** $\ge 4$ cores dedicated to Docker Engine.
+- **Memory:** $\ge 8\text{ GB}$ RAM dedicated to Docker Engine.
+- **Disk:** $\ge 20\text{ GB}$ free local storage for ephemeral container volumes and test logs.

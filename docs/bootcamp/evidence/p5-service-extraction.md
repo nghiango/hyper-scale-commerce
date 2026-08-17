@@ -129,8 +129,8 @@ Environment: one test JVM booting both applications against shared Testcontainer
 
 | Measurement | Value |
 |---|---:|
-| POST /orders latency | 28.0 ms |
-| End-to-end (POST → read model visible) | 516.5 ms |
+| POST /orders latency | 25.5 ms |
+| End-to-end (POST → read model visible) | 524.5 ms |
 
 ### Idempotency
 
@@ -142,5 +142,5 @@ Load: 10 concurrent users, ramp-up 1s, duration 3s.
 
 | Endpoint | p95 (ms) | Throughput (RPS) | Error rate |
 |---|---:|---:|---:|
-| GET /orders/{id} | 0.81 | 18032.33 | 0.00 |
-| GET /orders | 2.12 | 7540.00 | 0.00 |
+| GET /orders/{id} | 0.70 | 26503.33 | 0.00 |
+| GET /orders | 1.98 | 7784.00 | 0.00 |

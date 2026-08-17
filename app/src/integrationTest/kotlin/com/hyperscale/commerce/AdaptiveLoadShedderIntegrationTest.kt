@@ -73,7 +73,7 @@ constructor(
       assertThat(checkoutDuringOverload.statusCode()).isEqualTo(201)
 
       // Actuator health remains available
-      val health = get("/actuator/health")
+      val health = get("/actuator/health/liveness")
       assertThat(health.statusCode()).isEqualTo(200)
     } finally {
       loadShedder.setForcedOverload(false)

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.hyperscale.commerce.Application
 import com.hyperscale.commerce.orderquery.OrderQueryApplication
 import com.hyperscale.commerce.resilience.ResilienceHarness
+import com.hyperscale.commerce.testsupport.IsolatedRedisContainer
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
@@ -51,6 +52,11 @@ class EndToEndTracingTest {
         PostgreSQLContainer("postgres:16").apply {
           setPortBindings(listOf("$POSTGRES_HOST_PORT:$POSTGRES_CONTAINER_PORT"))
         }
+
+    @Container
+    @JvmStatic
+    val redis =
+        IsolatedRedisContainer(DockerImageName.parse("redis:7.2-alpine")).withExposedPorts(6379)
   }
 
   @Test
@@ -100,6 +106,8 @@ class EndToEndTracingTest {
             "--spring.datasource.username=${postgres.username}",
             "--spring.datasource.password=${postgres.password}",
             "--spring.kafka.bootstrap-servers=${kafka.bootstrapServers}",
+            "--spring.data.redis.host=${redis.host}",
+            "--spring.data.redis.port=${redis.getMappedPort(6379)}",
             "--spring.flyway.locations=classpath:db/migration",
             "--spring.flyway.schemas=public",
             "--server.port=0",
@@ -116,6 +124,8 @@ class EndToEndTracingTest {
             "--spring.datasource.username=${postgres.username}",
             "--spring.datasource.password=${postgres.password}",
             "--spring.kafka.bootstrap-servers=${kafka.bootstrapServers}",
+            "--spring.data.redis.host=${redis.host}",
+            "--spring.data.redis.port=${redis.getMappedPort(6379)}",
             "--spring.flyway.locations=classpath:db/migration-order-query",
             "--spring.flyway.schemas=order_query",
             "--server.port=0",

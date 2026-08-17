@@ -38,7 +38,10 @@ private const val SKU_PREFIX = "PERF-SKU-"
 
 @Testcontainers
 @ActiveProfiles("local")
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = ["app.rate-limiting.enabled=false"],
+)
 class CatalogLoadTest @Autowired constructor(@LocalServerPort private val port: Int) {
 
   companion object {

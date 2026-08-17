@@ -41,7 +41,7 @@ class ClientRateLimitFilterTest {
 
   @Test
   fun `blocks requests exceeding limit with HTTP 429 and Retry-After header`() {
-    for (i in 1..5) {
+    repeat(5) {
       val request = MockHttpServletRequest("GET", "/catalog/products/1")
       request.remoteAddr = "10.0.0.1"
       val response = MockHttpServletResponse()
@@ -64,7 +64,7 @@ class ClientRateLimitFilterTest {
 
   @Test
   fun `separate clients have independent rate limit quotas`() {
-    for (i in 1..5) {
+    repeat(5) {
       val request = MockHttpServletRequest("GET", "/catalog/products/1")
       request.remoteAddr = "10.0.0.1"
       val response = MockHttpServletResponse()
@@ -82,7 +82,7 @@ class ClientRateLimitFilterTest {
 
   @Test
   fun `actuator endpoints are excluded from rate limiting`() {
-    for (i in 1..10) {
+    repeat(10) {
       val request = MockHttpServletRequest("GET", "/actuator/health")
       request.remoteAddr = "10.0.0.1"
       val response = MockHttpServletResponse()

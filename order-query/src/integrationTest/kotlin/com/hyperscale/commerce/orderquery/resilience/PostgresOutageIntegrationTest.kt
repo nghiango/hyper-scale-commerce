@@ -75,7 +75,7 @@ class PostgresOutageIntegrationTest {
       assertThat(get(port, "/orders/$order1").statusCode()).isEqualTo(200)
 
       ResilienceHarness.stopPostgres(postgres)
-      ResilienceHarness.awaitHealthContains(port, "\"db\":{\"status\":\"DOWN\"}")
+      ResilienceHarness.awaitHealthContains(port, "\"DOWN\"", path = "/actuator/health/readiness")
       val uncachedOrder = 99999L
       assertThat(get(port, "/orders/$uncachedOrder").statusCode()).isGreaterThanOrEqualTo(500)
 
@@ -83,7 +83,7 @@ class PostgresOutageIntegrationTest {
       produceOrderPlaced(order2, producerBootstrap)
 
       ResilienceHarness.startPostgres(postgres)
-      ResilienceHarness.awaitHealthContains(port, "\"db\":{\"status\":\"UP\"}")
+      ResilienceHarness.awaitHealthContains(port, "\"UP\"", path = "/actuator/health/readiness")
       awaitOrder(port, order1)
       assertThat(get(port, "/orders/$order1").statusCode()).isEqualTo(200)
       awaitOrder(port, order2)

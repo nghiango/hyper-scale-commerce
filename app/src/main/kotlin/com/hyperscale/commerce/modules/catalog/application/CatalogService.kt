@@ -1,45 +1,52 @@
 package com.hyperscale.commerce.modules.catalog.application
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
+import com.hyperscale.commerce.config.cache.CacheInvalidationService
+import com.hyperscale.commerce.config.cache.L2CacheStore
+import com.hyperscale.commerce.config.cache.NearCache
 import com.hyperscale.commerce.modules.catalog.domain.ProductId
 import com.hyperscale.commerce.modules.catalog.domain.ProductNotFoundException
 import com.hyperscale.commerce.modules.catalog.domain.ProductRepository
 import com.hyperscale.commerce.modules.catalog.domain.Sku
 import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics
 import java.time.Duration
-import java.util.Optional
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 
 @Service
 class CatalogService(
     private val productRepository: ProductRepository,
     @Autowired(required = false) meterRegistry: MeterRegistry? = null,
+    @Autowired(required = false) l2Store: L2CacheStore? = null,
+    @Autowired(required = false) private val invalidationService: CacheInvalidationService? = null,
 ) {
 
-  private val productCache: Cache<Long, Optional<ProductDto>> =
-      Caffeine.newBuilder()
-          .maximumSize(PRODUCT_CACHE_MAX_SIZE)
-          .expireAfterWrite(Duration.ofSeconds(PRODUCT_CACHE_TTL_SECONDS))
-          .recordStats()
-          .build()
+  private val productCache =
+      NearCache<Long, ProductDto>(
+          name = PRODUCT_CACHE_NAME,
+          l1MaxSize = PRODUCT_CACHE_MAX_SIZE,
+          l1Ttl = Duration.ofSeconds(PRODUCT_CACHE_TTL_SECONDS),
+          meterRegistry = meterRegistry,
+          l2Store = l2Store,
+          valueClass = ProductDto::class.java,
+      )
 
-  private val listCache: Cache<String, PagedProductsDto> =
-      Caffeine.newBuilder()
-          .maximumSize(LIST_CACHE_MAX_SIZE)
-          .expireAfterWrite(Duration.ofSeconds(LIST_CACHE_TTL_SECONDS))
-          .recordStats()
-          .build()
+  private val listCache =
+      NearCache<String, PagedProductsDto>(
+          name = LIST_CACHE_NAME,
+          l1MaxSize = LIST_CACHE_MAX_SIZE,
+          l1Ttl = Duration.ofSeconds(LIST_CACHE_TTL_SECONDS),
+          meterRegistry = meterRegistry,
+          l2Store = l2Store,
+          valueClass = PagedProductsDto::class.java,
+      )
 
   init {
-    if (meterRegistry != null) {
-      CaffeineCacheMetrics.monitor(meterRegistry, productCache, "catalog_products")
-      CaffeineCacheMetrics.monitor(meterRegistry, listCache, "catalog_list")
-    }
+    invalidationService?.registerCache(productCache)
+    invalidationService?.registerCache(listCache)
   }
 
+  @Transactional(readOnly = true)
   fun listProducts(query: String?, page: Int, size: Int): PagedProductsDto {
     require(page >= MIN_PAGE) { "Page must not be negative" }
     require(size in MIN_SIZE..MAX_SIZE) { "Size must be between $MIN_SIZE and $MAX_SIZE" }
@@ -55,29 +62,35 @@ class CatalogService(
     }!!
   }
 
+  @Transactional(readOnly = true)
   fun getProductById(id: Long): ProductDto {
     val cached =
         productCache.get(id) {
           val product = productRepository.findById(ProductId(id))
-          Optional.ofNullable(product?.toDto())
+          product?.toDto()
         }
 
-    return cached?.orElse(null) ?: throw ProductNotFoundException("Product with id $id not found")
+    return cached ?: throw ProductNotFoundException("Product with id $id not found")
   }
 
+  @Transactional(readOnly = true)
   fun getProductBySku(sku: String): ProductDto {
     val product = productRepository.findBySku(Sku(sku))
     return product?.toDto() ?: throw ProductNotFoundException("Product with SKU $sku not found")
   }
 
   fun evictAll() {
-    productCache.invalidateAll()
-    listCache.invalidateAll()
+    productCache.evictAll()
+    listCache.evictAll()
+    invalidationService?.publishInvalidation(PRODUCT_CACHE_NAME)
+    invalidationService?.publishInvalidation(LIST_CACHE_NAME)
   }
 
   fun evictProduct(id: Long) {
-    productCache.invalidate(id)
-    listCache.invalidateAll()
+    productCache.evict(id)
+    listCache.evictAll()
+    invalidationService?.publishInvalidation(PRODUCT_CACHE_NAME, id.toString())
+    invalidationService?.publishInvalidation(LIST_CACHE_NAME)
   }
 
   private fun com.hyperscale.commerce.modules.catalog.domain.Product.toDto(): ProductDto =
@@ -98,5 +111,7 @@ class CatalogService(
     private const val PRODUCT_CACHE_TTL_SECONDS = 60L
     private const val LIST_CACHE_MAX_SIZE = 2_000L
     private const val LIST_CACHE_TTL_SECONDS = 30L
+    private const val PRODUCT_CACHE_NAME = "catalog_products"
+    private const val LIST_CACHE_NAME = "catalog_list"
   }
 }

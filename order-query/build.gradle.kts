@@ -75,6 +75,7 @@ dependencies {
   implementation("org.flywaydb:flyway-database-postgresql")
   implementation("org.jetbrains.kotlin:kotlin-reflect")
   implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
+  implementation("org.springframework.boot:spring-boot-starter-data-redis")
   runtimeOnly("org.postgresql:postgresql")
 
   jooqCodegen("org.jooq:jooq-meta-extensions:3.19.28")

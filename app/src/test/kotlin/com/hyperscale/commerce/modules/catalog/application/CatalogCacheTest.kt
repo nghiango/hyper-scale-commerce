@@ -1,5 +1,6 @@
 package com.hyperscale.commerce.modules.catalog.application
 
+import com.hyperscale.commerce.config.cache.CacheInvalidationService
 import com.hyperscale.commerce.modules.catalog.domain.Availability
 import com.hyperscale.commerce.modules.catalog.domain.Money
 import com.hyperscale.commerce.modules.catalog.domain.Product
@@ -12,12 +13,26 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.mock
 import org.mockito.Mockito.times
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 
 class CatalogCacheTest {
+
+  @Test
+  fun `product eviction publishes product and list invalidations`() {
+    val repository = mock(ProductRepository::class.java)
+    val invalidationService = mock(CacheInvalidationService::class.java)
+    val service = CatalogService(repository, invalidationService = invalidationService)
+    clearInvocations(invalidationService)
+
+    service.evictProduct(42L)
+
+    verify(invalidationService).publishInvalidation("catalog_products", "42")
+    verify(invalidationService).publishInvalidation("catalog_list")
+  }
 
   @Test
   fun `repeated getProductById returns cached result without repository call`() {

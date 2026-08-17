@@ -1,0 +1,59 @@
+groups:
+  - name: hyperscale-commerce-cache-replica-alerts
+    rules:
+      # =========================================================================
+      # 1. Distributed L2 Cache (Redis) Alerts
+      # =========================================================================
+      - alert: RedisNodeDown
+        expr: (redis_up == 0) or absent(redis_up)
+        for: 1m
+        labels:
+          severity: critical
+          component: redis-cache
+        annotations:
+          summary: "Redis L2 cache node is down"
+          description: "Redis instance is unreachable; near-cache is operating in degraded fail-open mode."
+          runbook_url: "docs/runbooks/distributed-caching-and-replica-operations.md"
+
+      - alert: L2CacheMissRateSpike
+        expr: |
+          rate(hyperscale_cache_gets_total{level="L2", result="miss"}[5m])
+          /
+          (rate(hyperscale_cache_gets_total{level="L2", result="hit"}[5m]) + rate(hyperscale_cache_gets_total{level="L2", result="miss"}[5m]))
+          > 0.40
+        for: 3m
+        labels:
+          severity: warning
+          component: redis-cache
+        annotations:
+          summary: "L2 distributed cache miss rate exceeds 40%"
+          description: "High L2 miss rate may indicate cache stampede or inadequate TTL sizing."
+          runbook_url: "docs/runbooks/distributed-caching-and-replica-operations.md"
+
+      # =========================================================================
+      # 2. Database Read-Replica Lag Alerts
+      # =========================================================================
+      - alert: PostgresReplicationLagHigh
+        expr: postgres_replication_lag_seconds > 1
+        for: 1m
+        labels:
+          severity: warning
+          component: postgres-replica
+        annotations:
+          summary: "PostgreSQL read-replica replication lag exceeds 1 second"
+          description: "Replication lag is {{ $value }}s; read queries are falling back to primary database."
+          runbook_url: "docs/runbooks/distributed-caching-and-replica-operations.md"
+
+      # =========================================================================
+      # 3. Cache Invalidation Stream Alerts
+      # =========================================================================
+      - alert: CacheInvalidationLagHigh
+        expr: kafka_consumergroup_lag{topic=~"(catalog|inventory|order)-cache-evict"} > 500
+        for: 2m
+        labels:
+          severity: warning
+          component: cache-invalidation
+        annotations:
+          summary: "Cache invalidation broadcast consumer lag is high"
+          description: "Consumer pods may be experiencing delayed cache invalidation propagation."
+          runbook_url: "docs/runbooks/distributed-caching-and-replica-operations.md"

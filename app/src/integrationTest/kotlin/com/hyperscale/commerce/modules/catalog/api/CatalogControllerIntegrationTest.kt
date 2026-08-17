@@ -40,7 +40,7 @@ constructor(
   fun `lists products with pagination`() {
     seedProduct(sku = "LIST-1", name = "Listable Product")
 
-    val response = get("$baseUrl?page=0&size=10")
+    val response = get("$baseUrl?query=Listable&page=0&size=10")
 
     assertThat(response.statusCode()).isEqualTo(200)
     assertThat(response.body()).contains("Listable Product")
@@ -141,6 +141,12 @@ constructor(
         """
         INSERT INTO catalog.products (sku, name, description, price, availability, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, now(), now())
+        ON CONFLICT (sku) DO UPDATE SET
+          name = EXCLUDED.name,
+          description = EXCLUDED.description,
+          price = EXCLUDED.price,
+          availability = EXCLUDED.availability,
+          updated_at = now()
         RETURNING id
         """
             .trimIndent(),

@@ -34,7 +34,10 @@ private const val SPIKE_P95_SLO_MS = 300.0
 
 @Testcontainers
 @ActiveProfiles("local")
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties = ["app.rate-limiting.enabled=false"],
+)
 class CatalogSloVerificationTest
 @Autowired
 constructor(@param:LocalServerPort private val port: Int) {

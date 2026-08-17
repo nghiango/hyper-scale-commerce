@@ -71,14 +71,16 @@ class PostgresOutageIntegrationTest {
       awaitOutboxPublished(jdbcTemplate, order1)
 
       ResilienceHarness.stopPostgres(postgres)
-      ResilienceHarness.awaitHealthContains(monolithPort, "\"db\":{\"status\":\"DOWN\"}")
+      ResilienceHarness.awaitHealthContains(
+          monolithPort, "\"DOWN\"", path = "/actuator/health/readiness")
 
       val failingResponse =
           post(monolithPort, "/orders", """{"items":[{"sku":"$SKU","quantity":$QUANTITY}]}""")
       assertThat(failingResponse.statusCode()).isGreaterThanOrEqualTo(500)
 
       ResilienceHarness.startPostgres(postgres)
-      ResilienceHarness.awaitHealthContains(monolithPort, "\"db\":{\"status\":\"UP\"}")
+      ResilienceHarness.awaitHealthContains(
+          monolithPort, "\"UP\"", path = "/actuator/health/readiness")
 
       awaitOutboxPublished(jdbcTemplate, order1)
       assertThat(eventsPublished(monolithPort)).isGreaterThanOrEqualTo(1.0)

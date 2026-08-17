@@ -49,6 +49,10 @@ class KafkaConfig(
     props[ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
     props[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
     props[ProducerConfig.MAX_BLOCK_MS_CONFIG] = MAX_BLOCK_MS
+    props[ProducerConfig.ACKS_CONFIG] = "all"
+    props[ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG] = true
+    props[ProducerConfig.RETRIES_CONFIG] = Int.MAX_VALUE
+    props[ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION] = MAX_IN_FLIGHT_REQUESTS
     return DefaultKafkaProducerFactory(props)
   }
 
@@ -164,6 +168,7 @@ class KafkaConfig(
 
   private companion object {
     const val MAX_BLOCK_MS = 3000
+    const val MAX_IN_FLIGHT_REQUESTS = 5
     const val HEALTH_TOPIC = "health-check"
     const val CONSUMER_GROUP = "order-query"
     const val DLQ_TOPIC = "order-placed-dlq"

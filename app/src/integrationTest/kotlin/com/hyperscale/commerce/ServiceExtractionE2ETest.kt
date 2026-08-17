@@ -16,6 +16,7 @@ import org.springframework.boot.builder.SpringApplicationBuilder
 import org.springframework.context.ConfigurableApplicationContext
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.kafka.core.KafkaTemplate
+import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.KafkaContainer
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
@@ -47,6 +48,11 @@ class ServiceExtractionE2ETest {
     val kafka: KafkaContainer = KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.7.1"))
 
     @Container @JvmStatic val postgres: PostgreSQLContainer<*> = PostgreSQLContainer("postgres:16")
+
+    @Container
+    @JvmStatic
+    val redis =
+        ExtractionRedisContainer(DockerImageName.parse("redis:7.2-alpine")).withExposedPorts(6379)
   }
 
   @Test
@@ -125,6 +131,8 @@ class ServiceExtractionE2ETest {
             "--spring.datasource.username=${postgres.username}",
             "--spring.datasource.password=${postgres.password}",
             "--spring.kafka.bootstrap-servers=${kafka.bootstrapServers}",
+            "--spring.data.redis.host=${redis.host}",
+            "--spring.data.redis.port=${redis.getMappedPort(6379)}",
             "--spring.flyway.locations=classpath:db/migration-order-query",
             "--spring.flyway.schemas=order_query",
             "--server.port=0",
@@ -140,6 +148,8 @@ class ServiceExtractionE2ETest {
             "--spring.datasource.username=${postgres.username}",
             "--spring.datasource.password=${postgres.password}",
             "--spring.kafka.bootstrap-servers=${kafka.bootstrapServers}",
+            "--spring.data.redis.host=${redis.host}",
+            "--spring.data.redis.port=${redis.getMappedPort(6379)}",
             "--spring.flyway.locations=classpath:db/migration",
             "--spring.flyway.schemas=public",
             "--server.port=0",
@@ -293,3 +303,6 @@ class ServiceExtractionE2ETest {
 
   private fun Double.format(digits: Int): String = String.format("%.${digits}f", this)
 }
+
+class ExtractionRedisContainer(image: DockerImageName) :
+    GenericContainer<ExtractionRedisContainer>(image)

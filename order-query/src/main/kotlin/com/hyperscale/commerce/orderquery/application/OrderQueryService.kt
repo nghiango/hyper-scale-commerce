@@ -1,17 +1,17 @@
 package com.hyperscale.commerce.orderquery.application
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
+import com.hyperscale.commerce.orderquery.application.cache.CacheInvalidationPublisher
+import com.hyperscale.commerce.orderquery.application.cache.L2CacheStore
+import com.hyperscale.commerce.orderquery.application.cache.NearCache
 import com.hyperscale.commerce.orderquery.domain.OrderNotFoundException
 import com.hyperscale.commerce.orderquery.jooq.order_query.Tables.ORDER_READ_MODEL
 import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics
 import java.time.Duration
-import java.util.Optional
 import org.jooq.DSLContext
 import org.jooq.Record
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import tools.jackson.core.type.TypeReference
 import tools.jackson.databind.ObjectMapper
 
@@ -20,21 +20,25 @@ class OrderQueryService(
     private val dsl: DSLContext,
     private val objectMapper: ObjectMapper,
     @Autowired(required = false) meterRegistry: MeterRegistry? = null,
+    private val l2CacheStore: L2CacheStore,
+    private val invalidationPublisher: CacheInvalidationPublisher =
+        CacheInvalidationPublisher { _, _ ->
+        },
 ) {
 
-  private val orderCache: Cache<Long, Optional<OrderDto>> =
-      Caffeine.newBuilder()
-          .maximumSize(ORDER_CACHE_MAX_SIZE)
-          .expireAfterWrite(Duration.ofSeconds(ORDER_CACHE_TTL_SECONDS))
-          .recordStats()
-          .build()
+  private val orderCache: NearCache<Long, OrderDto> =
+      NearCache(
+          name = ORDER_CACHE_NAME,
+          l1MaxSize = ORDER_CACHE_MAX_SIZE,
+          l1Ttl = Duration.ofSeconds(ORDER_CACHE_TTL_SECONDS),
+          l2Ttl = Duration.ofMinutes(ORDER_CACHE_L2_TTL_MINUTES),
+          l2Store = l2CacheStore,
+          valueClass = OrderDto::class.java,
+          objectMapper = objectMapper,
+          meterRegistry = meterRegistry,
+      )
 
-  init {
-    if (meterRegistry != null) {
-      CaffeineCacheMetrics.monitor(meterRegistry, orderCache, "order_query")
-    }
-  }
-
+  @Transactional(readOnly = true)
   fun getOrder(id: Long): OrderDto {
     val cached =
         orderCache.get(id) {
@@ -48,20 +52,31 @@ class OrderQueryService(
                   .from(ORDER_READ_MODEL)
                   .where(ORDER_READ_MODEL.ORDER_ID.eq(id))
                   .fetchOne()
-          Optional.ofNullable(row?.toDto())
+          row?.toDto()
         }
 
-    return cached?.orElse(null) ?: throw OrderNotFoundException("Order with id $id not found")
+    return cached ?: throw OrderNotFoundException("Order with id $id not found")
   }
 
   fun evictOrder(id: Long) {
-    orderCache.invalidate(id)
+    orderCache.evict(id)
+    invalidationPublisher.publish(ORDER_CACHE_NAME, id.toString())
   }
 
   fun evictAll() {
-    orderCache.invalidateAll()
+    orderCache.evictAll()
+    invalidationPublisher.publish(ORDER_CACHE_NAME, null)
   }
 
+  fun evictLocal(id: Long) {
+    orderCache.evictLocal(id)
+  }
+
+  fun evictAllLocal() {
+    orderCache.evictAllLocal()
+  }
+
+  @Transactional(readOnly = true)
   fun listOrders(page: Int, size: Int): PagedOrdersDto {
     require(page >= MIN_PAGE) { "Page must not be negative" }
     require(size in MIN_SIZE..MAX_SIZE) { "Size must be between $MIN_SIZE and $MAX_SIZE" }
@@ -91,12 +106,14 @@ class OrderQueryService(
     )
   }
 
-  private companion object {
+  companion object {
     const val MIN_PAGE = 0
     const val MIN_SIZE = 1
     const val MAX_SIZE = 100
     const val ORDER_CACHE_MAX_SIZE = 50_000L
     const val ORDER_CACHE_TTL_SECONDS = 30L
+    const val ORDER_CACHE_L2_TTL_MINUTES = 10L
+    const val ORDER_CACHE_NAME = "order_query"
     val ORDER_ITEMS_TYPE: TypeReference<List<OrderItemDto>> =
         object : TypeReference<List<OrderItemDto>>() {}
   }

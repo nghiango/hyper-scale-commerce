@@ -11,20 +11,24 @@
 ## Implementation Status
 
 This document contains both implemented patterns and future architectural
-blueprints. As of completed Phase 13:
+blueprints. As of the completed Phase 16 baseline, with Phase 17 still under
+implementation and review:
 
 | Capability | Status |
 |---|---|
 | Transactional outbox, idempotent consumers, CQRS, sagas, schema compatibility | Implemented and locally verified |
-| Caffeine near-cache, `SKIP LOCKED` workers, load shedding | Implemented and locally verified |
+| Caffeine cache, `SKIP LOCKED` workers, load shedding | Implemented and locally verified |
 | DLQ replay and out-of-order projection guards | Implemented and locally verified |
-| Multi-replica application runtime and multi-broker Kafka | Planned for Phase 14 |
-| PostgreSQL HA, partitioning/sharding, multi-region DR | Blueprint only; later phase |
+| Multi-replica application runtime and 3-broker Kafka KRaft quorum | Implemented and locally verified through Phase 14 |
+| PostgreSQL HA, fencing, backup, and PITR | Implemented and locally verified through Phase 15 |
+| Local Kubernetes orchestration, replicated ingress, HPA, PDB, RBAC, and NetworkPolicy | Implemented and locally verified through Phase 16 |
+| Redis L2 cache, event-driven invalidation, and read-replica routing | Phase 17 in progress; end-to-end qualification not passed |
+| Partitioning/sharding and multi-region DR | Blueprint only; later evidence-triggered phase |
 | SPIFFE/mTLS and tail-sampling collector backend | Blueprint only; later phase |
 
-The current client rate limiter is per `app` process. It must not be described
-as a cluster-global distributed quota until an ingress or shared-state design
-has been implemented and verified.
+The Phase 16 ingress rate limiter uses replicated HAProxy peers to synchronize
+stick-table state inside the local `kind` topology. That result must not be
+generalized to a cloud-global or multi-region quota.
 
 ---
 

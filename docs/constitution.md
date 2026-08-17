@@ -38,6 +38,9 @@ The system evolves through these stages:
 12. Multi-Replica Data-Path Efficiency
 13. Distributed Stream Operations
 14. Multi-Replica Runtime and Messaging High Availability
+15. PostgreSQL High Availability, Fencing, and Disaster Recovery
+16. Local Kubernetes, Ingress, and Workload Orchestration
+17. Distributed Multi-Level Caching and Read-Replica Scaling
 
 Architecture must not skip directly to the final state.
 

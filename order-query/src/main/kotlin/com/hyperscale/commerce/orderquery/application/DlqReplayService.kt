@@ -46,9 +46,7 @@ class DlqReplayService(
     KafkaConsumer<String, String>(props).use { consumer ->
       consumer.subscribe(listOf(dlqTopic))
       val records = consumer.poll(Duration.ofMillis(POLL_TIMEOUT_MS))
-      for (record in records) {
-        if (replayed + skipped >= maxRecords) break
-
+      for (record in records.take(maxRecords)) {
         val currentRedriveCount =
             record.headers().lastHeader(HEADER_REDRIVE_COUNT)?.value()?.let {
               String(it).toIntOrNull() ?: 0

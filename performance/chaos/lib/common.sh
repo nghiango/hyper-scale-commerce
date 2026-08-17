@@ -32,7 +32,12 @@ log_error() {
 validate_target_safety() {
   local target="$1"
   case "$target" in
-    hyperscale-app|hyperscale-order-query|hyperscale-postgres|hyperscale-kafka|hyperscale-toxiproxy|app|order-query|postgres|kafka|toxiproxy)
+    hyperscale-app|hyperscale-order-query|hyperscale-postgres|hyperscale-kafka|hyperscale-toxiproxy|app|order-query|postgres|kafka|toxiproxy|\
+    hyperscale-app-1|hyperscale-app-2|hyperscale-order-query-1|hyperscale-order-query-2|\
+    hyperscale-kafka-1|hyperscale-kafka-2|hyperscale-kafka-3|hyperscale-haproxy|\
+    hyperscale-postgres-1|hyperscale-postgres-2|hyperscale-postgres-3|\
+    hyperscale-etcd-1|hyperscale-etcd-2|hyperscale-etcd-3|\
+    app-1|app-2|order-query-1|order-query-2|kafka-1|kafka-2|kafka-3|haproxy|postgres-1|postgres-2|postgres-3|etcd-1|etcd-2|etcd-3)
       return 0
       ;;
     *)

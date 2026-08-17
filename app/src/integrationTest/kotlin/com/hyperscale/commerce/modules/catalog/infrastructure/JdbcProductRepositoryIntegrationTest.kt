@@ -70,12 +70,12 @@ constructor(
 
   @Test
   fun `searches products by sku`() {
-    seedProduct(sku = "UNIQUE-SKU-123", name = "By SKU")
+    seedProduct(sku = "REPOSITORY-UNIQUE-SKU-123", name = "By SKU")
 
-    val result = repository.search(query = "UNIQUE-SKU", page = 0, size = 10)
+    val result = repository.search(query = "REPOSITORY-UNIQUE-SKU", page = 0, size = 10)
 
     assertThat(result).hasSize(1)
-    assertThat(result.first().sku.value).isEqualTo("UNIQUE-SKU-123")
+    assertThat(result.first().sku.value).isEqualTo("REPOSITORY-UNIQUE-SKU-123")
   }
 
   @Test
@@ -107,6 +107,12 @@ constructor(
         """
         INSERT INTO catalog.products (sku, name, description, price, availability, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, now(), now())
+        ON CONFLICT (sku) DO UPDATE SET
+          name = EXCLUDED.name,
+          description = EXCLUDED.description,
+          price = EXCLUDED.price,
+          availability = EXCLUDED.availability,
+          updated_at = now()
         RETURNING id
         """
             .trimIndent(),
