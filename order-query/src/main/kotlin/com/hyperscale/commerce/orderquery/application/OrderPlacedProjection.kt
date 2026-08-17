@@ -16,6 +16,7 @@ import tools.jackson.databind.ObjectMapper
 class OrderPlacedProjection(
     private val dsl: DSLContext,
     private val objectMapper: ObjectMapper,
+    private val orderQueryService: OrderQueryService,
     meterRegistry: MeterRegistry,
 ) {
   private val eventsConsumed: Counter =
@@ -54,6 +55,8 @@ class OrderPlacedProjection(
         .set(ORDER_READ_MODEL.ITEMS, DSL.cast(DSL.value(items), ORDER_READ_MODEL.ITEMS.dataType))
         .set(ORDER_READ_MODEL.UPDATED_AT, DSL.currentOffsetDateTime())
         .execute()
+
+    orderQueryService.evictOrder(orderId)
     eventsConsumed.increment()
     acknowledgment.acknowledge()
   }

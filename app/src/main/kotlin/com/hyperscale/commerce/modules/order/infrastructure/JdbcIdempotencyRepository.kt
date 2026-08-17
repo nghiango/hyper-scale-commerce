@@ -4,6 +4,8 @@ import com.hyperscale.commerce.modules.order.domain.IdempotencyRecord
 import com.hyperscale.commerce.modules.order.domain.IdempotencyRepository
 import com.hyperscale.commerce.modules.order.domain.IdempotencyStatus
 import java.sql.ResultSet
+import java.sql.Timestamp
+import java.time.Instant
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -69,6 +71,22 @@ class JdbcIdempotencyRepository(
         """
             .trimIndent(),
         key,
+    )
+  }
+
+  override fun pruneExpired(olderThan: Instant, batchSize: Int): Int {
+    return jdbcTemplate.update(
+        """
+        DELETE FROM "order".idempotency_keys
+        WHERE key IN (
+          SELECT key FROM "order".idempotency_keys
+          WHERE expires_at < ?
+          LIMIT ?
+        )
+        """
+            .trimIndent(),
+        Timestamp.from(olderThan),
+        batchSize,
     )
   }
 

@@ -51,6 +51,14 @@ app:
     enabled: true
     latency-threshold-ms: 200
     max-in-flight-degradable: 500
+  storage:
+    pruning:
+      enabled: true
+      outbox-retention-days: 7
+      idempotency-retention-hours: 24
+      batch-size: 1000
+      interval-ms: 3600000
+      initial-delay-ms: 60000
 
 management:
   endpoints:

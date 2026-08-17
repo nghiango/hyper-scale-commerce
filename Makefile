@@ -1,4 +1,4 @@
-.PHONY: up down services test verify run clean load-smoke load-baseline load-verify load-spike load-saga chaos-up chaos-down chaos-preflight chaos-clean chaos-smoke
+.PHONY: up down services test verify run clean load-smoke load-baseline load-verify load-spike load-saga load-cache chaos-up chaos-down chaos-preflight chaos-clean chaos-smoke
 
 up: ## Start local infrastructure (PostgreSQL)
 	docker compose up -d
@@ -36,6 +36,9 @@ load-spike: ## Run 5x traffic spike and recovery qualification scenario
 
 load-saga: ## Run saga compensation and idempotency qualification scenario
 	bash performance/scripts/run-scenario.sh saga-idempotency
+
+load-cache: ## Run high-throughput cached read qualification scenario
+	bash performance/scripts/run-scenario.sh cached-throughput
 
 chaos-up: ## Build and start services with Toxiproxy chaos overlay
 	./gradlew :app:bootJar :order-query:bootJar

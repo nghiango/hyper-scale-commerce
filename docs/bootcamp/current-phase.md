@@ -1,17 +1,18 @@
 # Current BootCamp Phase
 
-Phase: 11
+Phase: 12
 
-Name: Advanced Distributed Workflows, Saga Compensations & Overload Protection
+Name: High-Throughput Caching, Multi-Replica Scheduling & Storage Lifecycle Management
 
 Status: COMPLETED
 
 Allowed technologies:
 
 - Kotlin
-- Spring Boot (Web Filters, Transaction Management)
+- Spring Boot (Web Filters, Cache Management)
+- Caffeine Cache (in-memory L1 cache)
 - Gradle (multi-module builds)
-- PostgreSQL 16 (Idempotency table, row-level locks)
+- PostgreSQL 16 (FOR UPDATE SKIP LOCKED, batch pruning)
 - Flyway
 - Docker (service images)
 - Docker Compose
@@ -41,9 +42,9 @@ Forbidden until later phases:
 
 Milestones:
 
-- P11-01: API Idempotency Key Engine (COMPLETED)
-- P11-02: Choreographed Saga Compensations (COMPLETED)
-- P11-03: Priority-Tiered Adaptive Load Shedder (COMPLETED)
-- P11-04: Event Schema Evolution & Compatibility Suite (COMPLETED)
-- P11-05: Distributed Workflows Chaos & Verification (COMPLETED)
-- P11-06: Phase 11 Consolidation & Review (COMPLETED)
+- P12-01: Lock-Free Multi-Replica Outbox Polling (SKIP LOCKED) (COMPLETED)
+- P12-02: Multi-Tier Caching & Cache Stampede Protection (COMPLETED)
+- P12-03: Event-Driven Cache Invalidation (COMPLETED)
+- P12-04: Automated Storage Lifecycle & Data Pruning Engine (COMPLETED)
+- P12-05: High-Throughput Caching & Pruning Qualification (COMPLETED)
+- P12-06: Phase 12 Review & Final Platform Dossier (COMPLETED)

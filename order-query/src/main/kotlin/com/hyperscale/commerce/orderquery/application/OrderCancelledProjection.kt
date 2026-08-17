@@ -15,6 +15,7 @@ import tools.jackson.databind.ObjectMapper
 class OrderCancelledProjection(
     private val dsl: DSLContext,
     private val objectMapper: ObjectMapper,
+    private val orderQueryService: OrderQueryService,
     meterRegistry: MeterRegistry,
 ) {
   private val logger = LoggerFactory.getLogger(OrderCancelledProjection::class.java)
@@ -41,6 +42,7 @@ class OrderCancelledProjection(
         .where(ORDER_READ_MODEL.ORDER_ID.eq(orderId))
         .execute()
 
+    orderQueryService.evictOrder(orderId)
     eventsConsumed.increment()
     acknowledgment.acknowledge()
   }

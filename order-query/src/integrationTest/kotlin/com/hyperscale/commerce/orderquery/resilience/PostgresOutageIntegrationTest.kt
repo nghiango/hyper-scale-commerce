@@ -76,7 +76,8 @@ class PostgresOutageIntegrationTest {
 
       ResilienceHarness.stopPostgres(postgres)
       ResilienceHarness.awaitHealthContains(port, "\"db\":{\"status\":\"DOWN\"}")
-      assertThat(get(port, "/orders/$order1").statusCode()).isGreaterThanOrEqualTo(500)
+      val uncachedOrder = 99999L
+      assertThat(get(port, "/orders/$uncachedOrder").statusCode()).isGreaterThanOrEqualTo(500)
 
       val order2 = 2L
       produceOrderPlaced(order2, producerBootstrap)

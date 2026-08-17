@@ -2,12 +2,17 @@ package com.hyperscale.commerce.modules.shared.outbox
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.hyperscale.commerce.config.OutboxProperties
+import com.hyperscale.commerce.jooq.order.Tables.OUTBOX_EVENTS
 import java.time.Duration
 import java.util.Properties
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.assertj.core.api.Assertions.assertThat
+import org.jooq.DSLContext
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -15,6 +20,8 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
 import org.testcontainers.containers.KafkaContainer
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
@@ -44,6 +51,8 @@ constructor(
     private val outboxRepository: OutboxRepository,
     private val outboxRelay: OutboxRelay,
     private val outboxProperties: OutboxProperties,
+    private val transactionManager: PlatformTransactionManager,
+    private val dsl: DSLContext,
 ) {
   private val objectMapper = ObjectMapper()
 
@@ -65,6 +74,11 @@ constructor(
     }
   }
 
+  @BeforeEach
+  fun cleanDb() {
+    dsl.deleteFrom(OUTBOX_EVENTS).execute()
+  }
+
   @Test
   fun `inserts and claims due outbox events in order`() {
     val firstId = outboxRepository.insert(FIRST_AGGREGATE_ID, EVENT_TYPE, PAYLOAD)
@@ -81,7 +95,51 @@ constructor(
 
     outboxRepository.markPublished(firstId)
     val remaining = outboxRepository.claimDue(CLAIM_LIMIT)
-    assertThat(remaining.map { it.id }).containsExactly(secondId)
+    assertThat(remaining.map { it.id }).contains(secondId)
+  }
+
+  @Test
+  fun `parallel workers claim non-overlapping batches via SKIP LOCKED`() {
+    val id1 = outboxRepository.insert("skip-1", EVENT_TYPE, PAYLOAD)
+    val id2 = outboxRepository.insert("skip-2", EVENT_TYPE, PAYLOAD)
+    val id3 = outboxRepository.insert("skip-3", EVENT_TYPE, PAYLOAD)
+    val id4 = outboxRepository.insert("skip-4", EVENT_TYPE, PAYLOAD)
+
+    val executor = Executors.newFixedThreadPool(2)
+    val worker1ClaimedLatch = CountDownLatch(1)
+    val worker2DoneLatch = CountDownLatch(1)
+
+    var worker1Batch = listOf<Long>()
+    var worker2Batch = listOf<Long>()
+
+    executor.submit {
+      TransactionTemplate(transactionManager).execute {
+        val claimed = outboxRepository.claimDue(2)
+        worker1Batch = claimed.map { it.id }
+        worker1ClaimedLatch.countDown()
+        // hold lock briefly until worker 2 claims
+        worker2DoneLatch.await(5, TimeUnit.SECONDS)
+      }
+    }
+
+    worker1ClaimedLatch.await(5, TimeUnit.SECONDS)
+
+    executor.submit {
+      TransactionTemplate(transactionManager).execute {
+        val claimed = outboxRepository.claimDue(2)
+        worker2Batch = claimed.map { it.id }
+        worker2DoneLatch.countDown()
+      }
+    }
+
+    worker2DoneLatch.await(5, TimeUnit.SECONDS)
+    executor.shutdown()
+    executor.awaitTermination(5, TimeUnit.SECONDS)
+
+    assertThat(worker1Batch).hasSize(2)
+    assertThat(worker2Batch).hasSize(2)
+    // Zero overlap between concurrent worker batches
+    assertThat(worker1Batch).doesNotContainAnyElementsOf(worker2Batch)
   }
 
   @Test
