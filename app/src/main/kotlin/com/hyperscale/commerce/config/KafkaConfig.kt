@@ -14,7 +14,6 @@ import org.apache.kafka.common.KafkaException
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.health.contributor.Health
 import org.springframework.boot.health.contributor.HealthIndicator
 import org.springframework.context.annotation.Bean
@@ -43,10 +42,10 @@ class KafkaConfig(
 
   @Bean
   fun kafkaProducerFactory(
-      @Value("\${spring.kafka.bootstrap-servers}") bootstrapServers: String,
+      kafkaProperties: KafkaProperties,
   ): ProducerFactory<String, String> {
     val props = HashMap<String, Any>()
-    props[ProducerConfig.BOOTSTRAP_SERVERS_CONFIG] = bootstrapServers
+    props[ProducerConfig.BOOTSTRAP_SERVERS_CONFIG] = kafkaProperties.bootstrapServers
     props[ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
     props[ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG] = StringSerializer::class.java
     props[ProducerConfig.MAX_BLOCK_MS_CONFIG] = MAX_BLOCK_MS
@@ -83,10 +82,10 @@ class KafkaConfig(
 
   @Bean
   fun kafkaConsumerFactory(
-      @Value("\${spring.kafka.bootstrap-servers}") bootstrapServers: String,
+      kafkaProperties: KafkaProperties,
   ): ConsumerFactory<String, String> {
     val props = HashMap<String, Any>()
-    props[ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG] = bootstrapServers
+    props[ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG] = kafkaProperties.bootstrapServers
     props[ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
     props[ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG] = StringDeserializer::class.java
     props[ConsumerConfig.GROUP_ID_CONFIG] = CONSUMER_GROUP

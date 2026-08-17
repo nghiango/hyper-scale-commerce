@@ -1,5 +1,6 @@
 global:
   namespace: hyperscale
+  revision: development
   imageRegistry: ""
   imagePullPolicy: IfNotPresent
   storageClass: "standard"

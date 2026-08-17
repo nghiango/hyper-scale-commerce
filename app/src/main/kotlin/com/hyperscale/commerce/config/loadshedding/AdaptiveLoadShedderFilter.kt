@@ -69,7 +69,7 @@ class AdaptiveLoadShedderFilter(
   private fun isDegradableEndpoint(request: HttpServletRequest): Boolean {
     val uri = request.requestURI
     val isProtected =
-        uri.startsWith("/actuator") || (request.method == "POST" && uri.startsWith("/orders"))
+        uri.startsWith("/actuator") || request.method == "POST" && uri.startsWith("/orders")
     return !isProtected && uri.startsWith("/catalog")
   }
 

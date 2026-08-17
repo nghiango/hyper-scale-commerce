@@ -4,6 +4,11 @@ import com.hyperscale.commerce.orderquery.application.cache.L2CacheStore
 import com.hyperscale.commerce.orderquery.application.cache.NearCache
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import tools.jackson.databind.ObjectMapper
@@ -44,6 +49,55 @@ class NearCacheTest {
 
     assertThat(cache(failingStore).get(2L) { CacheValue(2L, "database") })
         .isEqualTo(CacheValue(2L, "database"))
+  }
+
+  @Test
+  fun `invalidation waits for a blocked load and removes its result`() {
+    val store = MemoryStore()
+    val cache = cache(store)
+    val source = AtomicReference(CacheValue(3L, "stale"))
+    val firstLoadStarted = CountDownLatch(1)
+    val allowFirstLoadToFinish = CountDownLatch(1)
+    val loads = AtomicInteger()
+    val evictionStarted = CountDownLatch(1)
+    val executor = Executors.newFixedThreadPool(2)
+
+    try {
+      val result =
+          executor.submit<CacheValue?> {
+            cache.get(3L) {
+              val snapshot = source.get()
+              if (loads.incrementAndGet() == 1) {
+                firstLoadStarted.countDown()
+                check(allowFirstLoadToFinish.await(5, TimeUnit.SECONDS))
+              }
+              snapshot
+            }
+          }
+
+      assertThat(firstLoadStarted.await(5, TimeUnit.SECONDS)).isTrue()
+      val eviction =
+          executor.submit {
+            evictionStarted.countDown()
+            cache.evictLocal(3L)
+          }
+      assertThat(evictionStarted.await(5, TimeUnit.SECONDS)).isTrue()
+      source.set(CacheValue(3L, "fresh"))
+      allowFirstLoadToFinish.countDown()
+
+      assertThat(result.get(5, TimeUnit.SECONDS)).isEqualTo(CacheValue(3L, "stale"))
+      eviction.get(5, TimeUnit.SECONDS)
+      assertThat(
+              cache.get(3L) {
+                loads.incrementAndGet()
+                source.get()
+              })
+          .isEqualTo(CacheValue(3L, "fresh"))
+      assertThat(loads.get()).isEqualTo(2)
+    } finally {
+      allowFirstLoadToFinish.countDown()
+      executor.shutdownNow()
+    }
   }
 
   private fun cache(store: L2CacheStore): NearCache<Long, CacheValue> =

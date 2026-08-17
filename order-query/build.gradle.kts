@@ -82,6 +82,8 @@ dependencies {
 
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
 
   detekt("io.gitlab.arturbosch.detekt:detekt-cli:1.23.8")
   detekt("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21")

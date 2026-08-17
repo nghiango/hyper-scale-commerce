@@ -57,7 +57,10 @@ class SloMetrics : MeterBinder {
           .tag("uri", "/orders/{id}")
           .tag("outcome", "SUCCESS")
           .timer()
-          ?.percentile(P95_PERCENTILE, TimeUnit.SECONDS) ?: 0.0
+          ?.takeSnapshot()
+          ?.percentileValues()
+          ?.firstOrNull { it.percentile() == P95_PERCENTILE }
+          ?.value(TimeUnit.SECONDS) ?: 0.0
 
   private fun getOrdersP95(): Double =
       registry
@@ -66,7 +69,10 @@ class SloMetrics : MeterBinder {
           .tag("uri", "/orders")
           .tag("outcome", "SUCCESS")
           .timer()
-          ?.percentile(P95_PERCENTILE, TimeUnit.SECONDS) ?: 0.0
+          ?.takeSnapshot()
+          ?.percentileValues()
+          ?.firstOrNull { it.percentile() == P95_PERCENTILE }
+          ?.value(TimeUnit.SECONDS) ?: 0.0
 
   private fun getPostOrdersSuccessRate(): Double {
     val total =

@@ -53,6 +53,7 @@ server:
 
 app:
   name: ${APP_NAME:order-query}
+  instance-id: ${HOSTNAME:local}
   datasource:
     primary:
       url: ${SPRING_DATASOURCE_PRIMARY_URL:}

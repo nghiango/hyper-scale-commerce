@@ -111,4 +111,57 @@ constructor(
             .fetchOne(ORDER_READ_MODEL.VERSION)
     assertThat(versionInDb).isEqualTo(2L)
   }
+
+  @Test
+  fun `cancellation arriving before placement preserves cancellation and later enriches items`() {
+    val orderId = 99999L
+    val ack = mock(Acknowledgment::class.java)
+    val cancellationTime = Instant.now()
+    val placementTime = cancellationTime.minusSeconds(1)
+
+    orderCancelledProjection.onOrderCancelled(
+        """
+        {
+          "version": 1,
+          "eventId": "evt-cancel-first",
+          "orderId": $orderId,
+          "reason": "Inventory unavailable",
+          "createdAt": "$cancellationTime",
+          "aggregateVersion": 2
+        }
+        """
+            .trimIndent(),
+        ack,
+    )
+
+    assertThat(orderQueryService.getOrder(orderId).status).isEqualTo("CANCELLED")
+    assertThat(orderQueryService.getOrder(orderId).items).isEmpty()
+
+    orderPlacedProjection.onOrderPlaced(
+        """
+        {
+          "version": 1,
+          "eventId": "evt-place-late",
+          "orderId": $orderId,
+          "status": "PLACED",
+          "createdAt": "$placementTime",
+          "items": [{"sku": "SKU-TEST-1", "quantity": 1}],
+          "aggregateVersion": 1
+        }
+        """
+            .trimIndent(),
+        ack,
+    )
+
+    val result = orderQueryService.getOrder(orderId)
+    assertThat(result.status).isEqualTo("CANCELLED")
+    assertThat(result.items).hasSize(1)
+    assertThat(result.items.single().sku).isEqualTo("SKU-TEST-1")
+    assertThat(
+            dsl.select(ORDER_READ_MODEL.VERSION)
+                .from(ORDER_READ_MODEL)
+                .where(ORDER_READ_MODEL.ORDER_ID.eq(orderId))
+                .fetchOne(ORDER_READ_MODEL.VERSION))
+        .isEqualTo(2L)
+  }
 }

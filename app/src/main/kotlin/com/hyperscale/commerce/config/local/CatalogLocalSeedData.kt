@@ -46,7 +46,7 @@ class CatalogLocalSeedData(jdbcTemplate: JdbcTemplate) : CommandLineRunner {
               .addValue("sku", "PERF-SKU-${index.toString().padStart(SKU_NUMBER_WIDTH, '0')}")
               .addValue("name", "Performance Product $index with $keyword")
               .addValue("description", "A performance test product for $keyword")
-              .addValue("price", BASE_PRICE + (index % PRICE_VARIATION_MODULUS))
+              .addValue("price", BASE_PRICE + index % PRICE_VARIATION_MODULUS)
               .addValue("availability", "IN_STOCK"))
     }
 

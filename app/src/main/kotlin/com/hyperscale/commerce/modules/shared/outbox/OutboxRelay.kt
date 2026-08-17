@@ -38,7 +38,7 @@ class OutboxRelay(
         hasMore = false
       } else {
         val keepGoing = publishBatch(dueEvents)
-        hasMore = keepGoing && (dueEvents.size >= claimLimit)
+        hasMore = keepGoing && dueEvents.size >= claimLimit
       }
     }
   }
@@ -103,9 +103,9 @@ class OutboxRelay(
     return runCatching {
           val root = objectMapper.readTree(payload)
           TraceContextCarrier(
-              correlationId = root.get("correlationId")?.takeIf { !it.isNull }?.asText(),
-              traceId = root.get("traceId")?.takeIf { !it.isNull }?.asText(),
-              parentSpanId = root.get("parentSpanId")?.takeIf { !it.isNull }?.asText(),
+              correlationId = root.get("correlationId")?.takeIf { !it.isNull }?.asString(),
+              traceId = root.get("traceId")?.takeIf { !it.isNull }?.asString(),
+              parentSpanId = root.get("parentSpanId")?.takeIf { !it.isNull }?.asString(),
               sampled = root.get("sampled")?.takeIf { !it.isNull }?.asBoolean(),
           )
         }

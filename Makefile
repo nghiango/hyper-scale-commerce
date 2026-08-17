@@ -1,4 +1,4 @@
-.PHONY: up down services test verify run clean load-smoke load-baseline load-verify load-spike load-saga load-cache load-stream-resilience chaos-up chaos-down chaos-preflight chaos-clean chaos-smoke ha-kafka-up ha-kafka-down ha-kafka-init ha-kafka-preflight ha-kafka-verify ha-services-up ha-services-down ha-ingress-preflight ha-ingress-test ha-events-test ha-ratelimit-test ha-chaos-smoke ha-chaos-replica ha-chaos-kafka-leader ha-chaos-quorum-loss ha-chaos-postgres-loss ha-load-verify ha-qualification ha-db-up ha-db-down ha-db-preflight ha-db-verify ha-db-connectivity-test ha-db-chaos-smoke ha-db-chaos-primary ha-db-chaos-standby ha-db-chaos-etcd ha-db-split-brain ha-db-backup ha-db-pitr-test ha-db-qualification k8s-cluster-up k8s-cluster-down k8s-cluster-preflight k8s-helm-lint k8s-stateful-verify k8s-stateless-verify k8s-hpa-verify k8s-security-verify k8s-qualification k8s-redis-verify cache-replica-qualification
+.PHONY: up down services test verify run clean load-smoke load-baseline load-verify load-spike load-saga load-cache load-stream-resilience chaos-up chaos-down chaos-preflight chaos-clean chaos-smoke ha-kafka-up ha-kafka-down ha-kafka-init ha-kafka-preflight ha-kafka-verify ha-services-up ha-services-down ha-ingress-preflight ha-ingress-test ha-events-test ha-ratelimit-test ha-chaos-smoke ha-chaos-replica ha-chaos-kafka-leader ha-chaos-quorum-loss ha-chaos-postgres-loss ha-load-verify ha-qualification ha-db-up ha-db-down ha-db-preflight ha-db-verify ha-db-connectivity-test ha-db-chaos-smoke ha-db-chaos-primary ha-db-chaos-standby ha-db-chaos-etcd ha-db-split-brain ha-db-backup ha-db-pitr-test ha-db-qualification k8s-cluster-up k8s-cluster-down k8s-cluster-preflight k8s-helm-lint k8s-stateful-verify k8s-stateless-verify k8s-hpa-verify k8s-security-verify k8s-qualification k8s-redis-verify cache-replica-qualification jvm-diagnostics-verify phase18-qualification
 
 up: ## Start local infrastructure (PostgreSQL)
 	docker compose up -d
@@ -185,3 +185,9 @@ k8s-redis-verify: ## Audit Kubernetes Redis L2 cache StatefulSet, Secret, and Ne
 
 cache-replica-qualification: ## Run end-to-end multi-level cache & read-replica load qualification
 	bash performance/kubernetes/scripts/run-cache-replica-qualification.sh
+
+jvm-diagnostics-verify: ## Verify local JFR, thread, heap, and deadlock diagnostics
+	bash performance/jvm/verify-jvm-diagnostics.sh
+
+phase18-qualification: ## Run fail-closed Phase 18 Kubernetes/JVM qualification
+	bash performance/kubernetes/scripts/run-phase18-qualification.sh

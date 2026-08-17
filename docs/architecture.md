@@ -2,7 +2,9 @@
 
 ## Current Stage
 
-Phase 17 — Distributed Multi-Level Caching & Read-Replica Scaling (**COMPLETED; PHASE REVIEW PASSED**).
+Phase 18 — Kotlin/JVM Engineering Maturity & Concurrency Safety (**IN PROGRESS;
+REMEDIATION AFTER FAILED REVIEW**). Phase 17 remains the latest completed and
+verified architecture baseline.
 
 
 ## Current Verified Architecture

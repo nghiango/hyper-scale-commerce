@@ -1,22 +1,20 @@
 # Current BootCamp Phase
 
-Phase: 17
+Phase: 18
 
-Name: Distributed Multi-Level Caching & Read-Replica Scaling
+Name: Kotlin/JVM Engineering Maturity & Concurrency Safety
 
-Status: COMPLETED — PHASE REVIEW PASSED
-
-Review record: [Phase 17 Review — Passed](evidence/p17-phase-review.md)
+Status: IN PROGRESS — REMEDIATION REQUIRED AFTER FAILED PHASE REVIEW
 
 Allowed technologies:
 
-- Kotlin
-- Spring Boot (Web Filters, Cache Management, Admin Endpoints)
+- Kotlin 2.2.21
+- Spring Boot 4.0.0 (Web Filters, Cache Management, Admin Endpoints, Configuration Properties)
 - Caffeine Cache (in-memory L1 local caches)
 - Redis 7.2 (Alpine, distributed L2 cache, Kubernetes StatefulSet, Lettuce client)
 - Spring Data Redis / Spring Cache abstractions
 - Spring Routing DataSource (`AbstractRoutingDataSource` for read/write splitting)
-- Gradle (multi-module builds)
+- Gradle (multi-module builds, shared convention build logic)
 - PostgreSQL 16 (Patroni primary, synchronous standby, asynchronous read replicas, `SKIP LOCKED`)
 - Patroni 3.x+ (consensus-based PostgreSQL HA and primary election daemon)
 - etcd 3.5+ (3-node consensus distributed configuration store)
@@ -45,9 +43,16 @@ Allowed technologies:
 - k6 (pinned load testing container)
 - POSIX shell, kubectl CLI, helm CLI
 - Prometheus Alerting Rule definitions
+- JDK 21 Diagnostic Tooling (Java Flight Recorder, `jcmd`, GC logs, thread dumps)
+- Test-only `kotlinx-coroutines-core` and `kotlinx-coroutines-test` (pinned, structured concurrency experiments)
+- Java 21 Virtual Threads (experimental comparison mode, configuration-gated)
 
 Forbidden until later phases:
 
+- Spring WebFlux / Reactor / R2DBC / reactive Redis / reactive Kafka
+- Production coroutines without specific non-transactional use case & ADR approval
+- Project Loom preview APIs
+- GraalVM native image
 - Cloud-managed ElastiCache / MemoryDB
 - Cloud-managed Kubernetes (EKS, GKE, AKS)
 - Cloud-managed PaaS infrastructure (RDS, Aurora, MSK)
@@ -60,11 +65,11 @@ Forbidden until later phases:
 
 Milestones:
 
-- P17-01: Architecture Decision Record ADR-0026 & Plan Approval (COMPLETED)
-- P17-02: Redis Distributed L2 Cache Packaging on Kubernetes (COMPLETED)
-- P17-03: Multi-Level Near-Cache Implementation (L1 Caffeine + L2 Redis) (COMPLETED)
-- P17-04: Event-Driven Cache Invalidation Bus (COMPLETED)
-- P17-05: PostgreSQL Read/Write Splitting & Dynamic DataSource Routing (COMPLETED)
-- P17-06: Cache & Replica Observability, Alerts & Runbooks (COMPLETED)
-- P17-07: High-Concurrency Performance, Fault Injection & Scaling Qualification (COMPLETED)
-- P17-08: Phase 17 Evidence Dossier and Phase Review (COMPLETED)
+- P18-01: Kotlin/JVM Baseline and ADR-0027 (REMEDIATION REQUIRED — PROFILING EVIDENCE INVALIDATED)
+- P18-02: Shared Kotlin Compiler and Static-Analysis Policy (COMPLETED)
+- P18-03: Type-Safe Configuration and Kotlin Boundary Hardening (COMPLETED)
+- P18-04: Deterministic Concurrency and Context-Safety Verification (FUNCTIONAL GATES VERIFIED; DISTRIBUTED QUALIFICATION PENDING)
+- P18-05: Structured-Concurrency and Execution-Model Qualification (FUNCTIONAL COMPARISON VERIFIED; PERFORMANCE/JFR GATES PENDING)
+- P18-06: JVM Diagnostics, Profiling, and Operational Runbook (LOCAL FIXTURE VERIFIED; IN-POD/LOAD EVIDENCE PENDING)
+- P18-07: Kotlin/JVM Load, Spike, Failure, and Soak Qualification (NOT QUALIFIED)
+- P18-08: Phase 18 Evidence Dossier and Formal Phase Review (NOT COMPLETE)

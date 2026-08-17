@@ -46,6 +46,8 @@ spec:
       app.kubernetes.io/component: app
   template:
     metadata:
+      annotations:
+        hyperscale.com/git-revision: {{ .Values.global.revision | quote }}
       labels:
         app.kubernetes.io/name: hyperscale-commerce
         app.kubernetes.io/component: app
@@ -76,6 +78,9 @@ spec:
           ports:
             - name: http
               containerPort: 8080
+          volumeMounts:
+            - name: diagnostics
+              mountPath: /diagnostics
           env:
             - name: SPRING_DATASOURCE_URL
               value: "jdbc:postgresql://postgres-ha-0.postgres-ha-headless.{{ .Values.global.namespace }}.svc.cluster.local:5432,postgres-ha-1.postgres-ha-headless.{{ .Values.global.namespace }}.svc.cluster.local:5432,postgres-ha-2.postgres-ha-headless.{{ .Values.global.namespace }}.svc.cluster.local:5432/hyperscale?targetServerType=primary"
@@ -123,4 +128,7 @@ spec:
             failureThreshold: 3
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
+      volumes:
+        - name: diagnostics
+          emptyDir: {}
 {{- end }}

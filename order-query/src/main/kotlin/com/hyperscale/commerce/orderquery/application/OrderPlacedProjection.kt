@@ -38,53 +38,97 @@ class OrderPlacedProjection(
 
   @KafkaListener(topics = ["\${app.outbox.topic}"], groupId = CONSUMER_GROUP)
   fun onOrderPlaced(message: String, acknowledgment: Acknowledgment) {
+    val event = parse(message)
+    val updated = upsert(event)
+    val enrichedCancellationTombstone = if (updated == 0) enrichCancellationTombstone(event) else 0
+
+    recordOutcome(event, updated, enrichedCancellationTombstone)
+    acknowledgment.acknowledge()
+  }
+
+  private fun parse(message: String): PlacedEvent {
     val root = objectMapper.readTree(message)
-    val orderId = root.get("orderId").asLong()
-    val status = root.get("status").asString()
-    val items = root.get("items").toString()
-    val aggregateVersion = root.get("aggregateVersion")?.asLong() ?: DEFAULT_VERSION
-    val createdAt = Instant.parse(root.get("createdAt").asText()).atOffset(ZoneOffset.UTC)
+    return PlacedEvent(
+        orderId = root.get("orderId").asLong(),
+        status = root.get("status").asString(),
+        items = root.get("items").toString(),
+        aggregateVersion = root.get("aggregateVersion")?.asLong() ?: DEFAULT_VERSION,
+        createdAt = Instant.parse(root.get("createdAt").asString()).atOffset(ZoneOffset.UTC),
+    )
+  }
 
-    val updated =
-        dsl.insertInto(
-                ORDER_READ_MODEL,
-                ORDER_READ_MODEL.ORDER_ID,
-                ORDER_READ_MODEL.STATUS,
-                ORDER_READ_MODEL.ITEMS,
-                ORDER_READ_MODEL.VERSION,
-                ORDER_READ_MODEL.CREATED_AT,
-            )
-            .values(
-                DSL.value(orderId),
-                DSL.value(status),
-                DSL.cast(DSL.value(items), ORDER_READ_MODEL.ITEMS.dataType),
-                DSL.value(aggregateVersion),
-                DSL.value(createdAt),
-            )
-            .onConflict(ORDER_READ_MODEL.ORDER_ID)
-            .doUpdate()
-            .set(ORDER_READ_MODEL.STATUS, status)
-            .set(
-                ORDER_READ_MODEL.ITEMS, DSL.cast(DSL.value(items), ORDER_READ_MODEL.ITEMS.dataType))
-            .set(ORDER_READ_MODEL.VERSION, aggregateVersion)
-            .set(ORDER_READ_MODEL.UPDATED_AT, DSL.currentOffsetDateTime())
-            .where(ORDER_READ_MODEL.VERSION.le(aggregateVersion))
-            .execute()
+  private fun upsert(event: PlacedEvent): Int =
+      dsl.insertInto(
+              ORDER_READ_MODEL,
+              ORDER_READ_MODEL.ORDER_ID,
+              ORDER_READ_MODEL.STATUS,
+              ORDER_READ_MODEL.ITEMS,
+              ORDER_READ_MODEL.VERSION,
+              ORDER_READ_MODEL.CREATED_AT,
+          )
+          .values(
+              DSL.value(event.orderId),
+              DSL.value(event.status),
+              DSL.cast(DSL.value(event.items), ORDER_READ_MODEL.ITEMS.dataType),
+              DSL.value(event.aggregateVersion),
+              DSL.value(event.createdAt),
+          )
+          .onConflict(ORDER_READ_MODEL.ORDER_ID)
+          .doUpdate()
+          .set(ORDER_READ_MODEL.STATUS, event.status)
+          .set(
+              ORDER_READ_MODEL.ITEMS,
+              DSL.cast(DSL.value(event.items), ORDER_READ_MODEL.ITEMS.dataType))
+          .set(ORDER_READ_MODEL.VERSION, event.aggregateVersion)
+          .set(ORDER_READ_MODEL.UPDATED_AT, DSL.currentOffsetDateTime())
+          .where(ORDER_READ_MODEL.VERSION.le(event.aggregateVersion))
+          .execute()
 
-    if (updated == 0) {
+  private fun enrichCancellationTombstone(event: PlacedEvent): Int =
+      dsl.update(ORDER_READ_MODEL)
+          .set(
+              ORDER_READ_MODEL.ITEMS,
+              DSL.cast(DSL.value(event.items), ORDER_READ_MODEL.ITEMS.dataType),
+          )
+          .set(ORDER_READ_MODEL.CREATED_AT, event.createdAt)
+          .set(ORDER_READ_MODEL.UPDATED_AT, DSL.currentOffsetDateTime())
+          .where(
+              ORDER_READ_MODEL.ORDER_ID.eq(event.orderId),
+              ORDER_READ_MODEL.STATUS.eq("CANCELLED"),
+              ORDER_READ_MODEL.VERSION.gt(event.aggregateVersion),
+              DSL.condition("{0} = '[]'::jsonb", ORDER_READ_MODEL.ITEMS),
+          )
+          .execute()
+
+  private fun recordOutcome(event: PlacedEvent, updated: Int, enriched: Int) {
+    if (updated == 0 && enriched == 0) {
       logger.warn(
           "Ignored out-of-order OrderPlaced event for orderId={} with version={}",
-          orderId,
-          aggregateVersion,
+          event.orderId,
+          event.aggregateVersion,
       )
       outOfOrderEvents.increment()
     } else {
-      orderQueryService.evictOrder(orderId)
+      if (enriched > 0) {
+        logger.info(
+            "Enriched cancellation-first projection for orderId={} without regressing version={}",
+            event.orderId,
+            event.aggregateVersion,
+        )
+        outOfOrderEvents.increment()
+      }
+      orderQueryService.evictOrder(event.orderId)
       eventsConsumed.increment()
     }
-
-    acknowledgment.acknowledge()
   }
+
+  private data class PlacedEvent(
+      val orderId: Long,
+      val status: String,
+      val items: String,
+      val aggregateVersion: Long,
+      val createdAt: java.time.OffsetDateTime,
+  )
 
   private companion object {
     const val EVENT_TYPE = "OrderPlaced"

@@ -8,4 +8,5 @@ import org.springframework.validation.annotation.Validated
 @ConfigurationProperties(prefix = "app")
 data class AppProperties(
     @field:NotBlank val name: String,
+    @field:NotBlank val instanceId: String = "local",
 )

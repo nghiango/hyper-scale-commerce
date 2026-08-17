@@ -51,6 +51,7 @@ server:
 
 app:
   name: ${APP_NAME:hyper-scale-commerce}
+  instance-id: ${HOSTNAME:local}
   datasource:
     primary:
       url: ${SPRING_DATASOURCE_PRIMARY_URL:}

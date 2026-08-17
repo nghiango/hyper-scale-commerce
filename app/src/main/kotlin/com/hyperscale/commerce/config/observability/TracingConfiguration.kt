@@ -13,7 +13,6 @@ import io.micrometer.tracing.brave.bridge.BraveTracer
 import io.micrometer.tracing.handler.DefaultTracingObservationHandler
 import io.micrometer.tracing.handler.PropagatingReceiverTracingObservationHandler
 import io.micrometer.tracing.handler.PropagatingSenderTracingObservationHandler
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -23,11 +22,9 @@ class TracingConfiguration {
 
   @Bean
   @ConditionalOnMissingBean(Tracing::class)
-  fun braveTracing(
-      @Value("\${spring.application.name:app}") serviceName: String,
-  ): Tracing {
+  fun braveTracing(appProperties: com.hyperscale.commerce.config.AppProperties): Tracing {
     return Tracing.newBuilder()
-        .localServiceName(serviceName)
+        .localServiceName(appProperties.name)
         .addSpanHandler(SpanHandler.NOOP)
         .build()
   }

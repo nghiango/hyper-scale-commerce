@@ -3,7 +3,11 @@ package com.hyperscale.commerce.config.cache
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import java.io.IOException
 import java.time.Duration
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
@@ -147,5 +151,59 @@ class NearCacheTest {
                 .counter()
                 ?.count())
         .isEqualTo(1.0)
+  }
+
+  @Test
+  fun `invalidation waits for a blocked load and removes its result`() {
+    val cache =
+        NearCache<Long, TestProduct>(
+            name = "products",
+            l2Store = InMemoryL2CacheStore(),
+            valueClass = TestProduct::class.java)
+    val source = AtomicReference(TestProduct(5L, "stale", 1.0))
+    val firstLoadStarted = CountDownLatch(1)
+    val allowFirstLoadToFinish = CountDownLatch(1)
+    val loads = AtomicInteger()
+    val evictionStarted = CountDownLatch(1)
+    val executor = Executors.newFixedThreadPool(2)
+
+    try {
+      val result =
+          executor.submit<TestProduct?> {
+            cache.get(5L) {
+              val snapshot = source.get()
+              if (loads.incrementAndGet() == 1) {
+                firstLoadStarted.countDown()
+                check(allowFirstLoadToFinish.await(5, TimeUnit.SECONDS))
+              }
+              snapshot
+            }
+          }
+
+      assertThat(firstLoadStarted.await(5, TimeUnit.SECONDS)).isTrue()
+      val eviction =
+          executor.submit {
+            evictionStarted.countDown()
+            cache.evictLocal(5L)
+          }
+      assertThat(evictionStarted.await(5, TimeUnit.SECONDS)).isTrue()
+      source.set(TestProduct(5L, "fresh", 2.0))
+      allowFirstLoadToFinish.countDown()
+
+      assertThat(result.get(5, TimeUnit.SECONDS)?.name).isEqualTo("stale")
+      eviction.get(5, TimeUnit.SECONDS)
+      assertThat(
+              cache
+                  .get(5L) {
+                    loads.incrementAndGet()
+                    source.get()
+                  }
+                  ?.name)
+          .isEqualTo("fresh")
+      assertThat(loads.get()).isEqualTo(2)
+    } finally {
+      allowFirstLoadToFinish.countDown()
+      executor.shutdownNow()
+    }
   }
 }

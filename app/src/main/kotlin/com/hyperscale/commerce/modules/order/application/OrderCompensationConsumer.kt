@@ -33,7 +33,8 @@ class OrderCompensationConsumer(
   fun onInventoryReservationFailed(message: String, acknowledgment: Acknowledgment) {
     val root = objectMapper.readTree(message)
     val orderId = root.get("orderId").asLong()
-    val reason = root.path("reason").asText("Inventory reservation failed")
+    val reason =
+        root.get("reason")?.takeIf { !it.isNull }?.asString() ?: "Inventory reservation failed"
     logger.info("Received inventory reservation failure for orderId={}, reason={}", orderId, reason)
 
     val cancelled = orderService.cancelOrder(orderId, reason)

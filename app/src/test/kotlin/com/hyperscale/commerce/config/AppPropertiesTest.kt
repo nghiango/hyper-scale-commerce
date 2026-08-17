@@ -14,9 +14,10 @@ class AppPropertiesTest {
 
   @Test
   fun `binds app properties from configuration`() {
-    contextRunner.withPropertyValues("app.name=test-app").run { context ->
+    contextRunner.withPropertyValues("app.name=test-app", "app.instance-id=pod-a").run { context ->
       assertThat(context).hasNotFailed()
       assertThat(context.getBean(AppProperties::class.java).name).isEqualTo("test-app")
+      assertThat(context.getBean(AppProperties::class.java).instanceId).isEqualTo("pod-a")
     }
   }
 
@@ -28,6 +29,13 @@ class AppPropertiesTest {
   @Test
   fun `fails to start when app name is blank`() {
     contextRunner.withPropertyValues("app.name= ").run { context ->
+      assertThat(context).hasFailed()
+    }
+  }
+
+  @Test
+  fun `fails to start when instance id is blank`() {
+    contextRunner.withPropertyValues("app.name=test-app", "app.instance-id= ").run { context ->
       assertThat(context).hasFailed()
     }
   }

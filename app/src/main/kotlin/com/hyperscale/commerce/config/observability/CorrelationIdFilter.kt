@@ -6,7 +6,6 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import java.util.UUID
 import org.slf4j.MDC
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.core.Ordered
 import org.springframework.core.annotation.Order
 import org.springframework.stereotype.Component
@@ -16,8 +15,9 @@ import org.springframework.web.filter.OncePerRequestFilter
 @Order(Ordered.LOWEST_PRECEDENCE)
 class CorrelationIdFilter(
     private val tracer: Tracer,
-    @Value("\${app.instance-id:\${HOSTNAME:local}}") private val instanceId: String,
+    appProperties: com.hyperscale.commerce.config.AppProperties,
 ) : OncePerRequestFilter() {
+  private val instanceId: String = appProperties.instanceId
 
   override fun doFilterInternal(
       request: HttpServletRequest,

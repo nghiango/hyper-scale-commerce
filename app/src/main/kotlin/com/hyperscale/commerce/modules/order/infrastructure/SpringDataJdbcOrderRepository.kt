@@ -18,7 +18,8 @@ class SpringDataJdbcOrderRepository(
             items = items.map { OrderItemEntity(sku = it.sku, quantity = it.quantity) },
         )
     val saved = orderJdbcRepository.save(entity)
-    val reloaded = orderJdbcRepository.findById(saved.id!!).orElseThrow()
+    val savedId = checkNotNull(saved.id) { "Order ID must be generated after save" }
+    val reloaded = orderJdbcRepository.findById(savedId).orElseThrow()
     return reloaded.toOrder()
   }
 
@@ -32,9 +33,9 @@ class SpringDataJdbcOrderRepository(
 
   private fun OrderEntity.toOrder(): Order =
       Order(
-          id = id!!,
+          id = checkNotNull(id) { "Order entity ID must not be null" },
           status = OrderStatus.valueOf(status),
           items = items.map { OrderItem(sku = it.sku, quantity = it.quantity) },
-          createdAt = createdAt!!,
+          createdAt = checkNotNull(createdAt) { "Order entity createdAt must not be null" },
       )
 }

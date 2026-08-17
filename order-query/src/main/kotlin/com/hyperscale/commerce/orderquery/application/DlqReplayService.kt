@@ -10,16 +10,12 @@ import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.kafka.core.KafkaTemplate
-import org.springframework.stereotype.Service
 
-@Service
 class DlqReplayService(
     private val kafkaTemplate: KafkaTemplate<String, String>,
-    @Value("\${spring.kafka.bootstrap-servers}") private val bootstrapServers: String,
-    @Autowired(required = false) meterRegistry: MeterRegistry? = null,
+    private val bootstrapServers: String,
+    meterRegistry: MeterRegistry? = null,
 ) {
 
   private val logger = LoggerFactory.getLogger(DlqReplayService::class.java)

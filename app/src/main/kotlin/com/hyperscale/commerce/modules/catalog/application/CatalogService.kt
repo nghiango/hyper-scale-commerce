@@ -52,14 +52,16 @@ class CatalogService(
     require(size in MIN_SIZE..MAX_SIZE) { "Size must be between $MIN_SIZE and $MAX_SIZE" }
 
     val cacheKey = "${query ?: ""}:$page:$size"
-    return listCache.get(cacheKey) {
-      val total = productRepository.count(query)
-      val products = productRepository.search(query, page, size)
-      PagedProductsDto(
-          total = total,
-          items = products.map { it.toDto() },
-      )
-    }!!
+    val result =
+        listCache.get(cacheKey) {
+          val total = productRepository.count(query)
+          val products = productRepository.search(query, page, size)
+          PagedProductsDto(
+              total = total,
+              items = products.map { it.toDto() },
+          )
+        }
+    return checkNotNull(result) { "Failed to compute product list" }
   }
 
   @Transactional(readOnly = true)

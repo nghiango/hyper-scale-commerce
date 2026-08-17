@@ -114,6 +114,16 @@ class NearCache<K : Any, V : Any>(
 
   fun evictLocal(key: K) {
     l1Cache.invalidate(key)
+    if (l2Store != null) {
+      val keyStr = "$name:$key"
+      try {
+        // An in-flight Caffeine load can repopulate L2 before invalidate returns. Repeating the
+        // shared eviction on every invalidation consumer prevents that stale value resurfacing.
+        l2Store.delete(keyStr)
+      } catch (e: Exception) {
+        log.warn("Fail-open: L2 event eviction error for key {}: {}", keyStr, e.message)
+      }
+    }
     evictionCounter("event")?.increment()
   }
 
@@ -131,6 +141,13 @@ class NearCache<K : Any, V : Any>(
 
   fun evictAllLocal() {
     l1Cache.invalidateAll()
+    if (l2Store != null) {
+      try {
+        l2Store.deleteByPrefix("$name:")
+      } catch (e: Exception) {
+        log.warn("Fail-open: L2 event clear error for cache {}: {}", name, e.message)
+      }
+    }
     evictionCounter("event")?.increment()
   }
 

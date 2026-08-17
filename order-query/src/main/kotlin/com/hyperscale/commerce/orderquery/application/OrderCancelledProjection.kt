@@ -3,6 +3,8 @@ package com.hyperscale.commerce.orderquery.application
 import com.hyperscale.commerce.orderquery.jooq.order_query.Tables.ORDER_READ_MODEL
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.MeterRegistry
+import java.time.Instant
+import java.time.ZoneOffset
 import org.jooq.DSLContext
 import org.jooq.impl.DSL
 import org.slf4j.LoggerFactory
@@ -39,18 +41,32 @@ class OrderCancelledProjection(
     val root = objectMapper.readTree(message)
     val orderId = root.get("orderId").asLong()
     val aggregateVersion = root.get("aggregateVersion")?.asLong() ?: DEFAULT_VERSION
+    val createdAt = Instant.parse(root.get("createdAt").asString()).atOffset(ZoneOffset.UTC)
     logger.info(
         "Projecting order cancellation for orderId={} version={}", orderId, aggregateVersion)
 
     val updated =
-        dsl.update(ORDER_READ_MODEL)
+        dsl.insertInto(
+                ORDER_READ_MODEL,
+                ORDER_READ_MODEL.ORDER_ID,
+                ORDER_READ_MODEL.STATUS,
+                ORDER_READ_MODEL.ITEMS,
+                ORDER_READ_MODEL.VERSION,
+                ORDER_READ_MODEL.CREATED_AT,
+            )
+            .values(
+                DSL.value(orderId),
+                DSL.value("CANCELLED"),
+                DSL.cast(DSL.value(EMPTY_ITEMS), ORDER_READ_MODEL.ITEMS.dataType),
+                DSL.value(aggregateVersion),
+                DSL.value(createdAt),
+            )
+            .onConflict(ORDER_READ_MODEL.ORDER_ID)
+            .doUpdate()
             .set(ORDER_READ_MODEL.STATUS, "CANCELLED")
             .set(ORDER_READ_MODEL.VERSION, aggregateVersion)
             .set(ORDER_READ_MODEL.UPDATED_AT, DSL.currentOffsetDateTime())
-            .where(
-                ORDER_READ_MODEL.ORDER_ID.eq(orderId),
-                ORDER_READ_MODEL.VERSION.le(aggregateVersion),
-            )
+            .where(ORDER_READ_MODEL.VERSION.le(aggregateVersion))
             .execute()
 
     if (updated == 0) {
@@ -72,5 +88,6 @@ class OrderCancelledProjection(
     const val EVENT_TYPE = "OrderCancelled"
     const val CONSUMER_GROUP = "order-query"
     const val DEFAULT_VERSION = 2L
+    const val EMPTY_ITEMS = "[]"
   }
 }

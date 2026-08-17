@@ -23,7 +23,8 @@ class DataSourceMetricsTest {
   @Test
   fun `publishes replica lag in seconds`() {
     val registry = SimpleMeterRegistry()
-    val tracker = DataSourceRoutingConfig().replicationLagTracker(100, registry)
+    val tracker =
+        DataSourceRoutingConfig().replicationLagTracker(DataSourceRoutingProperties(), registry)
 
     tracker.recordLag(250)
 

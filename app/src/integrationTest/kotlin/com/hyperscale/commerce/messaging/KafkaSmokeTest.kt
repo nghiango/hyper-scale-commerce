@@ -12,7 +12,6 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.server.LocalServerPort
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection
@@ -43,7 +42,7 @@ class KafkaSmokeTest
 constructor(
     @param:LocalServerPort private val port: Int,
     private val kafkaTemplate: KafkaTemplate<String, String>,
-    @Value("\${spring.kafka.bootstrap-servers}") private val bootstrapServers: String,
+    private val kafkaProperties: com.hyperscale.commerce.config.KafkaProperties,
 ) {
 
   companion object {
@@ -68,7 +67,7 @@ constructor(
     kafkaTemplate.send(SMOKE_TOPIC, SMOKE_KEY, SMOKE_VALUE).get(TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
     val props = Properties()
-    props["bootstrap.servers"] = bootstrapServers
+    props["bootstrap.servers"] = kafkaProperties.bootstrapServers
     props["group.id"] = SMOKE_GROUP
     props["key.deserializer"] = StringDeserializer::class.java.name
     props["value.deserializer"] = StringDeserializer::class.java.name
