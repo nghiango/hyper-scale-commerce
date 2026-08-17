@@ -1,0 +1,117 @@
+groups:
+  - name: hyperscale-commerce-slo-alerts
+    rules:
+      # =========================================================================
+      # 1. Critical API Latency SLO Alerts (p95 < 200ms)
+      # =========================================================================
+      - alert: CatalogApiP95LatencyBreached
+        expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri=~"/catalog.*"}[2m])) by (le)) > 0.200
+        for: 1m
+        labels:
+          severity: critical
+          sli: latency
+          service: app
+        annotations:
+          summary: "Catalog API p95 latency breached 200ms SLO"
+          description: "Catalog API 95th percentile latency is {{ $value | humanizeDuration }} over the last 2 minutes."
+          runbook_url: "docs/runbooks/database-pool-exhaustion.md"
+
+      - alert: OrderCreationApiP95LatencyBreached
+        expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri="/orders",method="POST"}[2m])) by (le)) > 0.200
+        for: 1m
+        labels:
+          severity: critical
+          sli: latency
+          service: app
+        annotations:
+          summary: "Order Creation API p95 latency breached 200ms SLO"
+          description: "POST /orders 95th percentile latency is {{ $value | humanizeDuration }} over the last 2 minutes."
+          runbook_url: "docs/runbooks/outbox-backlog-recovery.md"
+
+      - alert: OrderQueryApiP95LatencyBreached
+        expr: histogram_quantile(0.95, sum(rate(http_server_requests_seconds_bucket{uri=~"/orders.*",method="GET"}[2m])) by (le)) > 0.200
+        for: 1m
+        labels:
+          severity: critical
+          sli: latency
+          service: order-query
+        annotations:
+          summary: "Order Query API p95 latency breached 200ms SLO"
+          description: "GET /orders 95th percentile latency is {{ $value | humanizeDuration }} over the last 2 minutes."
+          runbook_url: "docs/runbooks/database-pool-exhaustion.md"
+
+      # =========================================================================
+      # 2. Availability & Error Rate Alerts (Availability >= 99.9%)
+      # =========================================================================
+      - alert: HttpServerErrorRateHigh
+        expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / sum(rate(http_server_requests_seconds_count[5m])) * 100 > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          sli: availability
+        annotations:
+          summary: "HTTP 5xx Server Error Rate exceeds 0.1%"
+          description: "Current 5xx error rate is {{ $value | humanizePercentage }} (SLO requires >= 99.9% success)."
+          runbook_url: "docs/runbooks/database-pool-exhaustion.md"
+
+      # =========================================================================
+      # 3. Asynchronous Event Pipeline & Outbox Alerts
+      # =========================================================================
+      - alert: DeadLetterQueueArrival
+        expr: increase(events_dlq_total[1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: dlq
+        annotations:
+          summary: "Dead Letter Queue received failed event(s)"
+          description: "A poison or unprocessable message was routed to the DLQ: {{ $value }} new record(s)."
+          runbook_url: "docs/runbooks/dlq-triage-and-replay.md"
+
+      - alert: OutboxRelayBacklogAging
+        expr: outbox_unpublished_oldest_age_seconds > 5.0
+        for: 2m
+        labels:
+          severity: warning
+          component: outbox
+          service: app
+        annotations:
+          summary: "Transactional Outbox unpublished event age exceeds 5 seconds"
+          description: "Oldest pending outbox event has been waiting for {{ $value | humanizeDuration }}."
+          runbook_url: "docs/runbooks/outbox-backlog-recovery.md"
+
+      - alert: KafkaConsumerLagHigh
+        expr: kafka_consumer_lag > 100
+        for: 2m
+        labels:
+          severity: warning
+          component: kafka-consumer
+        annotations:
+          summary: "Kafka consumer group lag exceeds 100 records"
+          description: "Consumer lag is {{ $value }} records behind topic partition log end offset."
+          runbook_url: "docs/runbooks/outbox-backlog-recovery.md"
+
+      # =========================================================================
+      # 4. Database Connection Pool Health Alerts
+      # =========================================================================
+      - alert: HikariCpConnectionTimeout
+        expr: increase(hikaricp_connections_timeout_total[1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: database-pool
+        annotations:
+          summary: "HikariCP connection pool acquisition timeout occurred"
+          description: "Applications are failing to acquire database connections within the 5000ms timeout budget."
+          runbook_url: "docs/runbooks/database-pool-exhaustion.md"
+
+      - alert: HikariCpConnectionLeakDetected
+        expr: increase(hikaricp_connections_leak_total[1m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: database-pool
+        annotations:
+          summary: "HikariCP detected unclosed connection held past leak threshold"
+          description: "A connection was held longer than 5000ms without being closed/returned to the pool."
+          runbook_url: "docs/runbooks/database-pool-exhaustion.md"

@@ -55,18 +55,25 @@ class OutboxRelay(
           eventContext.correlationId ?: UUID.randomUUID().toString())
       MDC.put(CorrelationIdFilter.TRACE_ID_MDC_KEY, span.context().traceId())
       MDC.put(CorrelationIdFilter.SPAN_ID_MDC_KEY, span.context().spanId())
+      val destinationTopic = resolveDestinationTopic(event.eventType)
       try {
         kafkaTemplate
-            .send(topic, event.aggregateId, event.payload)
+            .send(destinationTopic, event.aggregateId, event.payload)
             .get(PUBLISH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         publishedIds.add(event.id)
         eventsPublished.increment()
       } catch (exception: KafkaException) {
-        logger.warn("Failed to publish outbox event {} to topic {}", event.id, topic, exception)
+        logger.warn(
+            "Failed to publish outbox event {} to topic {}", event.id, destinationTopic, exception)
       } catch (exception: ExecutionException) {
-        logger.warn("Failed to publish outbox event {} to topic {}", event.id, topic, exception)
+        logger.warn(
+            "Failed to publish outbox event {} to topic {}", event.id, destinationTopic, exception)
       } catch (exception: TimeoutException) {
-        logger.warn("Timed out publishing outbox event {} to topic {}", event.id, topic, exception)
+        logger.warn(
+            "Timed out publishing outbox event {} to topic {}",
+            event.id,
+            destinationTopic,
+            exception)
       } catch (exception: InterruptedException) {
         Thread.currentThread().interrupt()
         continueProcessing = false
@@ -83,6 +90,13 @@ class OutboxRelay(
       outboxRepository.markPublished(publishedIds)
     }
     return continueProcessing
+  }
+
+  private fun resolveDestinationTopic(eventType: String): String {
+    return when (eventType) {
+      "OrderCancelled" -> "order-cancelled"
+      else -> topic
+    }
   }
 
   private fun parseTraceContext(payload: String): TraceContextCarrier {

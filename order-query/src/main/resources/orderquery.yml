@@ -52,12 +52,16 @@ management:
   endpoints:
     web:
       exposure:
-        include: health, prometheus
+        include: health, info, prometheus
   endpoint:
     health:
       probes:
         enabled: true
       show-components: always
       group:
+        liveness:
+          include: livenessState
         readiness:
           include: readinessState, db
+    info:
+      enabled: true

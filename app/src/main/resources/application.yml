@@ -47,17 +47,25 @@ app:
     topic: order-placed
     relay-interval-ms: 100
     claim-limit: 500
+  load-shedding:
+    enabled: true
+    latency-threshold-ms: 200
+    max-in-flight-degradable: 500
 
 management:
   endpoints:
     web:
       exposure:
-        include: health, prometheus
+        include: health, info, prometheus
   endpoint:
     health:
       probes:
         enabled: true
       show-components: always
       group:
+        liveness:
+          include: livenessState
         readiness:
           include: readinessState, db
+    info:
+      enabled: true

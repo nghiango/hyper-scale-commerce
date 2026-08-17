@@ -7,7 +7,7 @@ services:
       - "8474:8474"   # Toxiproxy Management API
       - "25432:5432"  # App PostgreSQL Proxy
       - "25433:5433"  # Order-Query PostgreSQL Proxy
-      - "29093:9092"  # Kafka Proxy
+      - "29099:9092"  # Kafka Proxy
     depends_on:
       postgres:
         condition: service_healthy

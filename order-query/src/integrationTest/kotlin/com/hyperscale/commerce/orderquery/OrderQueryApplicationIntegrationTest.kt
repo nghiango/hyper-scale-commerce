@@ -103,6 +103,19 @@ constructor(
         )
   }
 
+  @Test
+  fun `sensitive actuator endpoints are not exposed`() {
+    val env = get("/actuator/env")
+    val beans = get("/actuator/beans")
+    val heapdump = get("/actuator/heapdump")
+    val info = get("/actuator/info")
+
+    assertThat(env.statusCode()).isEqualTo(404)
+    assertThat(beans.statusCode()).isEqualTo(404)
+    assertThat(heapdump.statusCode()).isEqualTo(404)
+    assertThat(info.statusCode()).isEqualTo(200)
+  }
+
   private fun get(path: String): HttpResponse<String> {
     val request = HttpRequest.newBuilder(URI.create("http://localhost:$port$path")).GET().build()
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString())

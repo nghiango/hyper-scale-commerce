@@ -25,6 +25,11 @@ class SpringDataJdbcOrderRepository(
   override fun findById(id: Long): Order? =
       orderJdbcRepository.findById(id).map { it.toOrder() }.orElse(null)
 
+  override fun updateStatus(id: Long, status: OrderStatus): Boolean {
+    val rows = orderJdbcRepository.updateStatus(id, status.name)
+    return rows > 0
+  }
+
   private fun OrderEntity.toOrder(): Order =
       Order(
           id = id!!,

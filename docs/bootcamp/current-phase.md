@@ -1,25 +1,24 @@
 # Current BootCamp Phase
 
-Phase: 10
+Phase: 11
 
-Name: Production Readiness, Operational Hardening & Final Certification
+Name: Advanced Distributed Workflows, Saga Compensations & Overload Protection
 
-Status: APPROVED
+Status: COMPLETED
 
 Allowed technologies:
 
 - Kotlin
-- Spring Boot (Graceful Shutdown, Actuator, Security)
+- Spring Boot (Web Filters, Transaction Management)
 - Gradle (multi-module builds)
-- PostgreSQL (HikariCP pool management)
+- PostgreSQL 16 (Idempotency table, row-level locks)
 - Flyway
 - Docker (service images)
 - Docker Compose
 - Testcontainers
 - ArchUnit (test-only)
-- Kafka
+- Kafka 3.7.0
 - spring-kafka
-- Testcontainers Kafka
 - Spring Data JDBC
 - jOOQ
 - Micrometer Tracing
@@ -34,12 +33,17 @@ Forbidden until later phases:
 
 - Kubernetes (deferred to cloud deployment)
 - Service mesh
+- Heavy BPMN workflow engines (Temporal/Camunda)
+- Distributed XA Two-Phase Commit transactions
 - Autoscaling / dynamic pod replicas
 - Cloud-managed PaaS infrastructure
 - Elasticsearch / OpenSearch
-- Event sourcing
-- Microservice sprawl / unnecessary new deployables
 
-Next milestone:
+Milestones:
 
-P10-01 — ADR-0016: Production Hardening, Security, and Lifecycle Strategy
+- P11-01: API Idempotency Key Engine (COMPLETED)
+- P11-02: Choreographed Saga Compensations (COMPLETED)
+- P11-03: Priority-Tiered Adaptive Load Shedder (COMPLETED)
+- P11-04: Event Schema Evolution & Compatibility Suite (COMPLETED)
+- P11-05: Distributed Workflows Chaos & Verification (COMPLETED)
+- P11-06: Phase 11 Consolidation & Review (COMPLETED)

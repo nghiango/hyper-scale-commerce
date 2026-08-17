@@ -1,13 +1,16 @@
 package com.hyperscale.commerce.modules.order.application
 
 import com.hyperscale.commerce.config.observability.CorrelationIdFilter
+import com.hyperscale.commerce.contracts.OrderCancelledEvent
 import com.hyperscale.commerce.contracts.OrderPlacedEvent
 import com.hyperscale.commerce.contracts.OrderPlacedItem
 import com.hyperscale.commerce.modules.order.domain.Order
 import com.hyperscale.commerce.modules.order.domain.OrderItem
 import com.hyperscale.commerce.modules.order.domain.OrderRepository
+import com.hyperscale.commerce.modules.order.domain.OrderStatus
 import com.hyperscale.commerce.modules.shared.outbox.OutboxRepository
 import io.micrometer.tracing.Tracer
+import java.time.Instant
 import java.util.UUID
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
@@ -52,6 +55,34 @@ class OrderService(
     return order.toDto()
   }
 
+  @Transactional
+  fun cancelOrder(orderId: Long, reason: String): Boolean {
+    val existing = orderRepository.findById(orderId) ?: return false
+    if (existing.status != OrderStatus.CANCELLED &&
+        orderRepository.updateStatus(orderId, OrderStatus.CANCELLED)) {
+      emitOrderCancelled(orderId, reason)
+    }
+    return true
+  }
+
+  private fun emitOrderCancelled(orderId: Long, reason: String) {
+    val span = tracer.currentSpan()
+    val payload =
+        objectMapper.writeValueAsString(
+            OrderCancelledEvent(
+                version = EVENT_VERSION,
+                eventId = UUID.randomUUID().toString(),
+                orderId = orderId,
+                reason = reason,
+                createdAt = Instant.now(),
+                correlationId = MDC.get(CorrelationIdFilter.CORRELATION_ID_MDC_KEY),
+                traceId = span?.context()?.traceId(),
+                parentSpanId = span?.context()?.spanId(),
+                sampled = span?.context()?.sampled(),
+            ))
+    outboxRepository.insert(orderId.toString(), ORDER_CANCELLED_EVENT_TYPE, payload)
+  }
+
   private fun Order.toDto(): OrderDto =
       OrderDto(
           id = id,
@@ -63,5 +94,6 @@ class OrderService(
   companion object {
     private const val EVENT_VERSION = 1
     private const val ORDER_PLACED_EVENT_TYPE = "OrderPlaced"
+    private const val ORDER_CANCELLED_EVENT_TYPE = "OrderCancelled"
   }
 }

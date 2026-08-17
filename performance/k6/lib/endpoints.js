@@ -93,6 +93,24 @@ export function postOrder(baseUrl, items) {
   }
 }
 
+export function postOrderWithKey(baseUrl, items, idempotencyKey) {
+  const url = `${baseUrl}/orders`;
+  const payload = JSON.stringify({ items });
+  const headers = Object.assign({}, JSON_HEADERS);
+  if (idempotencyKey) {
+    headers['Idempotency-Key'] = idempotencyKey;
+  }
+  const res = http.post(url, payload, {
+    tags: { endpoint: 'post_orders' },
+    headers: headers,
+  });
+
+  criticalApiDuration.add(res.timings.duration);
+  orderPostOrdersDuration.add(res.timings.duration);
+
+  return res;
+}
+
 export function getOrderById(baseUrl, id, customTags = {}) {
   const url = `${baseUrl}/orders/${id}`;
   const tags = Object.assign({ endpoint: 'get_order_by_id' }, customTags);

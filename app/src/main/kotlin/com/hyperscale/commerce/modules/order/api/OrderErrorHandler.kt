@@ -18,6 +18,26 @@ class OrderErrorHandler {
         .body(OrderError(ex.message ?: "Bad request"))
   }
 
+  @ExceptionHandler(
+      com.hyperscale.commerce.modules.order.application.IdempotencyConflictException::class)
+  fun handleIdempotencyConflict(
+      ex: com.hyperscale.commerce.modules.order.application.IdempotencyConflictException
+  ): ResponseEntity<OrderError> {
+    logger.debug("Idempotency conflict: {}", ex.message)
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(OrderError(ex.message ?: "Idempotency conflict"))
+  }
+
+  @ExceptionHandler(
+      com.hyperscale.commerce.modules.order.application.IdempotencyPayloadMismatchException::class)
+  fun handleIdempotencyMismatch(
+      ex: com.hyperscale.commerce.modules.order.application.IdempotencyPayloadMismatchException
+  ): ResponseEntity<OrderError> {
+    logger.debug("Idempotency payload mismatch: {}", ex.message)
+    return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+        .body(OrderError(ex.message ?: "Idempotency key payload mismatch"))
+  }
+
   @ExceptionHandler(MethodArgumentNotValidException::class)
   fun handleValidation(ex: MethodArgumentNotValidException): ResponseEntity<OrderError> {
     logger.debug("Validation failed: {}", ex.message)

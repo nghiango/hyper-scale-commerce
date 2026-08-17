@@ -88,19 +88,23 @@ bash "${SCRIPT_DIR}/snapshot-metrics.sh" after "${OUTPUT_DIR}"
 
 # 8. Asynchronous drain period
 echo "=== [DRAIN] Waiting for in-flight outbox/Kafka/projection drain ==="
-MAX_DRAIN_SECONDS=60
+MAX_DRAIN_SECONDS=180
 DRAIN_START=$(date +%s)
 while true; do
   UNPUBLISHED=$(docker exec -i hyperscale-postgres psql -U hyperscale -d hyperscale -t -A -c "SELECT count(*) FROM \"order\".outbox_events WHERE published_at IS NULL;" 2>/dev/null || echo "0")
-  if [ "${UNPUBLISHED}" -eq 0 ]; then
-    echo "=== [DRAIN] All outbox events published (took $(( $(date +%s) - DRAIN_START ))s), waiting for consumer commit ==="
-    sleep 6
+  ORDERS=$(docker exec -i hyperscale-postgres psql -U hyperscale -d hyperscale -t -A -c "SELECT count(*) FROM \"order\".orders;" 2>/dev/null || echo "0")
+  READ_MODEL=$(docker exec -i hyperscale-postgres psql -U hyperscale -d hyperscale -t -A -c "SELECT count(*) FROM order_query.order_read_model;" 2>/dev/null || echo "0")
+  CANCELLED_ORDERS=$(docker exec -i hyperscale-postgres psql -U hyperscale -d hyperscale -t -A -c "SELECT count(*) FROM \"order\".orders WHERE status = 'CANCELLED';" 2>/dev/null || echo "0")
+  CANCELLED_READ_MODEL=$(docker exec -i hyperscale-postgres psql -U hyperscale -d hyperscale -t -A -c "SELECT count(*) FROM order_query.order_read_model WHERE status = 'CANCELLED';" 2>/dev/null || echo "0")
+  if [ "${UNPUBLISHED}" -eq 0 ] && [ "${ORDERS}" -eq "${READ_MODEL}" ] && [ "${CANCELLED_ORDERS}" -eq "${CANCELLED_READ_MODEL}" ]; then
+    echo "=== [DRAIN] All outbox events published and projected (took $(( $(date +%s) - DRAIN_START ))s) ==="
+    sleep 3
     break
   fi
   NOW=$(date +%s)
   ELAPSED=$((NOW - DRAIN_START))
   if [ "${ELAPSED}" -ge "${MAX_DRAIN_SECONDS}" ]; then
-    echo "=== [DRAIN] Warning: drain timeout reached (${UNPUBLISHED} outbox events remaining) ==="
+    echo "=== [DRAIN] Warning: drain timeout reached (${UNPUBLISHED} outbox, ${ORDERS} orders, ${READ_MODEL} read_model, ${CANCELLED_ORDERS} vs ${CANCELLED_READ_MODEL} cancelled) ==="
     break
   fi
   sleep 2
