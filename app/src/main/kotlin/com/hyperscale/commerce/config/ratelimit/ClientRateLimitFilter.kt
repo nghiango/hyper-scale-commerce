@@ -81,11 +81,12 @@ class ClientRateLimitFilter(
   private fun resolveClientId(request: HttpServletRequest): String {
     val apiKey = request.getHeader("X-API-Key")
     val forwarded = request.getHeader("X-Forwarded-For")
-    val clientId = when {
-      !apiKey.isNullOrBlank() -> "api-key:$apiKey"
-      !forwarded.isNullOrBlank() -> "ip:${forwarded.split(",")[0].trim()}"
-      else -> "ip:${request.remoteAddr ?: "unknown"}"
-    }
+    val clientId =
+        when {
+          !apiKey.isNullOrBlank() -> "api-key:$apiKey"
+          !forwarded.isNullOrBlank() -> "ip:${forwarded.split(",")[0].trim()}"
+          else -> "ip:${request.remoteAddr ?: "unknown"}"
+        }
     return clientId
   }
 
