@@ -30,25 +30,47 @@ class OrderCancelledProjection(
           "consumer",
           CONSUMER_GROUP)
 
+  private val outOfOrderEvents: Counter =
+      meterRegistry.counter(
+          "events_out_of_order_total", "event_type", EVENT_TYPE, "consumer", CONSUMER_GROUP)
+
   @KafkaListener(topics = ["order-cancelled"], groupId = CONSUMER_GROUP)
   fun onOrderCancelled(message: String, acknowledgment: Acknowledgment) {
     val root = objectMapper.readTree(message)
     val orderId = root.get("orderId").asLong()
-    logger.info("Projecting order cancellation for orderId={}", orderId)
+    val aggregateVersion = root.get("aggregateVersion")?.asLong() ?: DEFAULT_VERSION
+    logger.info(
+        "Projecting order cancellation for orderId={} version={}", orderId, aggregateVersion)
 
-    dsl.update(ORDER_READ_MODEL)
-        .set(ORDER_READ_MODEL.STATUS, "CANCELLED")
-        .set(ORDER_READ_MODEL.UPDATED_AT, DSL.currentOffsetDateTime())
-        .where(ORDER_READ_MODEL.ORDER_ID.eq(orderId))
-        .execute()
+    val updated =
+        dsl.update(ORDER_READ_MODEL)
+            .set(ORDER_READ_MODEL.STATUS, "CANCELLED")
+            .set(ORDER_READ_MODEL.VERSION, aggregateVersion)
+            .set(ORDER_READ_MODEL.UPDATED_AT, DSL.currentOffsetDateTime())
+            .where(
+                ORDER_READ_MODEL.ORDER_ID.eq(orderId),
+                ORDER_READ_MODEL.VERSION.le(aggregateVersion),
+            )
+            .execute()
 
-    orderQueryService.evictOrder(orderId)
-    eventsConsumed.increment()
+    if (updated == 0) {
+      logger.warn(
+          "Ignored out-of-order OrderCancelled event for orderId={} with version={}",
+          orderId,
+          aggregateVersion,
+      )
+      outOfOrderEvents.increment()
+    } else {
+      orderQueryService.evictOrder(orderId)
+      eventsConsumed.increment()
+    }
+
     acknowledgment.acknowledge()
   }
 
   private companion object {
     const val EVENT_TYPE = "OrderCancelled"
     const val CONSUMER_GROUP = "order-query"
+    const val DEFAULT_VERSION = 2L
   }
 }

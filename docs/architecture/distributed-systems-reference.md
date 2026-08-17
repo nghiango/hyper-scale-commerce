@@ -8,6 +8,26 @@
 
 ---
 
+## Implementation Status
+
+This document contains both implemented patterns and future architectural
+blueprints. As of completed Phase 13:
+
+| Capability | Status |
+|---|---|
+| Transactional outbox, idempotent consumers, CQRS, sagas, schema compatibility | Implemented and locally verified |
+| Caffeine near-cache, `SKIP LOCKED` workers, load shedding | Implemented and locally verified |
+| DLQ replay and out-of-order projection guards | Implemented and locally verified |
+| Multi-replica application runtime and multi-broker Kafka | Planned for Phase 14 |
+| PostgreSQL HA, partitioning/sharding, multi-region DR | Blueprint only; later phase |
+| SPIFFE/mTLS and tail-sampling collector backend | Blueprint only; later phase |
+
+The current client rate limiter is per `app` process. It must not be described
+as a cluster-global distributed quota until an ingress or shared-state design
+has been implemented and verified.
+
+---
+
 ## Table of Contents
 
 1. [Distributed Sagas & Compensating Transactions](#1-distributed-sagas--compensating-transactions)

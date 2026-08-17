@@ -1,24 +1,24 @@
 # Current BootCamp Phase
 
-Phase: 12
+Phase: 13
 
-Name: High-Throughput Caching, Multi-Replica Scheduling & Storage Lifecycle Management
+Name: Distributed Stream Operations, DLQ Replay & Out-of-Order Event Resilience
 
 Status: COMPLETED
 
 Allowed technologies:
 
 - Kotlin
-- Spring Boot (Web Filters, Cache Management)
-- Caffeine Cache (in-memory L1 cache)
+- Spring Boot (Web Filters, Cache Management, Admin Endpoints)
+- Caffeine Cache (in-memory L1 caches and fixed-window rate limiting)
 - Gradle (multi-module builds)
-- PostgreSQL 16 (FOR UPDATE SKIP LOCKED, batch pruning)
+- PostgreSQL 16 (`SKIP LOCKED`, storage pruning, idempotency, and optimistic version columns)
 - Flyway
 - Docker (service images)
 - Docker Compose
 - Testcontainers
 - ArchUnit (test-only)
-- Kafka 3.7.0
+- Kafka 3.7.0 (Dead Letter Queues, custom headers)
 - spring-kafka
 - Spring Data JDBC
 - jOOQ
@@ -42,9 +42,16 @@ Forbidden until later phases:
 
 Milestones:
 
-- P12-01: Lock-Free Multi-Replica Outbox Polling (SKIP LOCKED) (COMPLETED)
-- P12-02: Multi-Tier Caching & Cache Stampede Protection (COMPLETED)
-- P12-03: Event-Driven Cache Invalidation (COMPLETED)
-- P12-04: Automated Storage Lifecycle & Data Pruning Engine (COMPLETED)
-- P12-05: High-Throughput Caching & Pruning Qualification (COMPLETED)
-- P12-06: Phase 12 Review & Final Platform Dossier (COMPLETED)
+- P13-01: Monotonic Aggregate Versioning & Out-of-Order Event Guard (COMPLETED)
+- P13-02: Dead Letter Queue Inspection & Administrative Replay Engine (COMPLETED)
+- P13-03: Per-Instance Client Rate Limiter Filter (COMPLETED)
+- P13-04: Stream Operations & Out-of-Order Resilience Qualification (COMPLETED)
+- P13-05: Phase 13 Review & Application-Level Platform Qualification (COMPLETED)
+
+Next planned phase:
+
+- Phase 14: Multi-Replica Runtime & Kafka High Availability
+- Plan: `docs/bootcamp/phase-14-plan.md`
+- Approval status: PROPOSED — NOT YET APPROVED FOR IMPLEMENTATION
+- Until approval, Phase 13 remains the current completed phase and its
+  technology constraints remain authoritative.

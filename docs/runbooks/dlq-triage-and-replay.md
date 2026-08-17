@@ -57,9 +57,16 @@ Inspect the standard Spring Kafka DLT headers:
 
 Once the upstream bug is fixed or database availability is restored, replay messages back to `order-placed`:
 
-1. **Verify Consumer Idempotency:**
-   Both `inventory` and `order-query` consumers are idempotent (keyed on `orderId`). Replaying will safely update or skip already-applied records without double-deducting inventory.
-2. **Re-publish Payload to Original Topic:**
+1. **Automated Administrative DLQ Replay API (Recommended):**
+   Call the order-query administrative replay endpoint:
+   ```bash
+   curl -X POST http://127.0.0.1:8081/admin/dlq/replay \
+     -H 'Content-Type: application/json' \
+     -d '{"dlqTopic": "order-placed-dlq", "targetTopic": "order-placed", "maxRecords": 100}'
+   ```
+   This automatically injects `X-Redrive-Count` headers (max 3 redrives) and re-publishes messages to the active stream.
+
+2. **Manual Re-publish via Kafka CLI (Fallback):**
    ```bash
    # Re-publish extracted payload to order-placed topic using the orderId as key
    echo '<ORDER_ID>:<PAYLOAD_JSON>' | docker exec -i hyperscale-kafka kafka-console-producer \

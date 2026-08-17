@@ -108,7 +108,29 @@ export function postOrderWithKey(baseUrl, items, idempotencyKey) {
   criticalApiDuration.add(res.timings.duration);
   orderPostOrdersDuration.add(res.timings.duration);
 
-  return res;
+  const success = check(res, {
+    'POST /orders status is 201': (r) => r.status === 201,
+    'POST /orders returned order id': (r) => {
+      try {
+        const json = JSON.parse(r.body);
+        return !!(json.id || json.orderId);
+      } catch (e) {
+        return false;
+      }
+    },
+  });
+
+  if (!success) {
+    return { res, orderId: null };
+  }
+
+  try {
+    const json = JSON.parse(res.body);
+    const orderId = json.id || json.orderId;
+    return { res, orderId };
+  } catch (e) {
+    return { res, orderId: null };
+  }
 }
 
 export function getOrderById(baseUrl, id, customTags = {}) {

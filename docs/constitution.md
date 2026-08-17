@@ -34,8 +34,16 @@ The system evolves through these stages:
 8. Observability
 9. Load Engineering
 10. Chaos Engineering
+11. Distributed Workflow Reliability
+12. Multi-Replica Data-Path Efficiency
+13. Distributed Stream Operations
+14. Multi-Replica Runtime and Messaging High Availability
 
 Architecture must not skip directly to the final state.
+
+Completion of an application-level phase does not imply that infrastructure
+high availability has been proved. Availability claims must name the tested
+topology and its remaining single points of failure.
 
 ---
 

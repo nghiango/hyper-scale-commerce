@@ -8,6 +8,7 @@ data class OrderCancelledEvent(
     val orderId: Long,
     val reason: String,
     val createdAt: Instant,
+    val aggregateVersion: Long = 2L,
     val correlationId: String? = null,
     val traceId: String? = null,
     val parentSpanId: String? = null,

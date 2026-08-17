@@ -3,12 +3,13 @@ package com.hyperscale.commerce.contracts
 import java.time.Instant
 
 data class OrderPlacedEvent(
-    val version: Int,
+    val version: Int = 1,
     val eventId: String,
     val orderId: Long,
     val status: String,
     val createdAt: Instant,
     val items: List<OrderPlacedItem>,
+    val aggregateVersion: Long = 1L,
     val correlationId: String? = null,
     val traceId: String? = null,
     val parentSpanId: String? = null,

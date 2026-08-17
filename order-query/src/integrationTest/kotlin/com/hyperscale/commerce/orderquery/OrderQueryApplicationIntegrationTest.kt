@@ -59,7 +59,7 @@ constructor(
             "SELECT max(version) FROM order_query.flyway_schema_history WHERE success",
             String::class.java,
         )
-    assertThat(version).isEqualTo("1")
+    assertThat(version).isEqualTo("2")
 
     val table =
         jdbcTemplate.queryForObject(

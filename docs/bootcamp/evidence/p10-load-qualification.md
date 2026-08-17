@@ -1,18 +1,25 @@
-# Final High-Concurrency Platform Certification — HyperScale Commerce (Phase 10)
+# Phase 10 High-Concurrency Platform Qualification — HyperScale Commerce
 
 **Date:** 2026-08-16  
-**Status:** **PASSED — ALL CONSTITUTIONAL CRITERIA SATISFIED**  
+**Status:** **PASSED — PHASE 10 BOUNDED LOAD CRITERIA SATISFIED**
+
 **Harness Version:** k6 0.57.0 (Dockerized container), Toxiproxy 2.11.0, PostgreSQL 16, Apache Kafka 3.7.0  
+
+> Qualification boundary (clarified 2026-08-17): The observed success rate is
+> an availability measurement for this bounded local load run. It does not
+> establish long-term production availability or cover multi-replica,
+> multi-broker, database, ingress, host, zone, or regional failure domains.
 
 ---
 
 ## 1. Executive Summary
 
-The final high-concurrency platform qualification load tests were executed to certify HyperScale Commerce against all constitutional performance and availability requirements:
+The Phase 10 high-concurrency load tests evaluated the constitutional
+performance targets and measured request success within a bounded local run:
 1. **10,000+ Concurrent Users:** **PASSED** (10,000 active virtual users sustained).
 2. **Sub-200ms p95 Latency for Critical APIs:** **PASSED** (p95 = **4.71ms** under 10k VUs; p95 = **2.42ms** under 5x spike).
 3. **5x Traffic Spikes:** **PASSED** (2,500 RPS burst sustained with 0.00% errors and sub-5ms p95 latency).
-4. **99.9% Availability:** **PASSED** (**100.00% success rate**, 0 errors across 1,984,840 total requests).
+4. **Bounded Availability Observation:** **100.00% request success** (0 errors across 1,984,840 total requests). This exceeds 99.9% for the observation window but does not prove long-term production availability.
 5. **Zero Intentional Data Loss:** **PASSED** (**100% data reconciliation** across all transactional schemas).
 
 ---
@@ -57,6 +64,8 @@ The final high-concurrency platform qualification load tests were executed to ce
 
 ---
 
-## 4. Platform Certification Conclusion
+## 4. Phase 10 Qualification Conclusion
 
-The empirical evidence certifies that HyperScale Commerce meets and exceeds every non-functional performance, scalability, and availability SLO mandated by the system constitution.
+The empirical evidence shows that the Phase 10 local topology met its approved
+performance, scalability, bounded request-success, and data-reconciliation
+criteria. Infrastructure high availability remains outside this evidence.
