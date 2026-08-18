@@ -182,10 +182,14 @@ query_primary() {
 }
 
 kafka_topic_count() {
-  local topic="$1"
-  kube exec "${KAFKA_POD}" -- kafka-get-offsets \
-    --bootstrap-server localhost:9092 --topic "${topic}" \
-    | awk -F: '{ total += $3 } END { print total + 0 }'
+  local topic="$1" output
+  output="$(kube exec "${KAFKA_POD}" -- kafka-get-offsets \
+    --bootstrap-server localhost:9092 --topic "${topic}" 2>/dev/null || true)"
+  if [ -z "${output}" ]; then
+    echo "0"
+  else
+    awk -F: '{ total += $3 } END { print total + 0 }' <<<"${output}"
+  fi
 }
 
 reset_orders() {
