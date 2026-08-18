@@ -110,7 +110,7 @@ fi
 
 kubectl --context "${CONTEXT}" cluster-info >/dev/null
 KUBE_CONTEXT="${CONTEXT}" bash "${SCRIPT_DIR}/preflight-cluster.sh"
-for workload in deployment/app deployment/order-query deployment/ingress statefulset/redis statefulset/postgres-ha statefulset/kafka; do
+for workload in deployment/app deployment/order-query statefulset/ingress statefulset/redis statefulset/postgres-ha statefulset/kafka; do
   kube rollout status "${workload}" --timeout=300s
 done
 
