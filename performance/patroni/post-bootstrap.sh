@@ -7,7 +7,8 @@ psql "$connection_string" \
   --set=ON_ERROR_STOP=1 \
   --set=app_user="$POSTGRES_USER" \
   --set=app_password="$POSTGRES_PASSWORD" \
-  --set=app_database="$POSTGRES_DB" <<'SQL'
+  --set=app_database="$POSTGRES_DB" \
+  --set=replicator_password="${REPLICATOR_PASSWORD:-replicator_pass}" <<'SQL'
 SELECT format(
     'CREATE ROLE %I LOGIN PASSWORD %L SUPERUSER CREATEDB',
     :'app_user',
@@ -20,6 +21,19 @@ SELECT format(
     'ALTER ROLE %I WITH LOGIN PASSWORD %L SUPERUSER CREATEDB',
     :'app_user',
     :'app_password'
+)
+\gexec
+
+SELECT format(
+    'CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD %L',
+    :'replicator_password'
+)
+WHERE NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'replicator')
+\gexec
+
+SELECT format(
+    'ALTER ROLE replicator WITH REPLICATION LOGIN PASSWORD %L',
+    :'replicator_password'
 )
 \gexec
 

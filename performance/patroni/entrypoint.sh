@@ -13,6 +13,14 @@ PATRONI_CONNECT_HOST="${PATRONI_CONNECT_HOST:-${NODE_NAME}}"
 mkdir -p "${PATRONI_DATA_DIR}"
 chmod 700 "${PATRONI_DATA_DIR}"
 
+cat <<EOF > /var/lib/postgresql/.pgpass
+*:*:*:replicator:${REPLICATOR_PASSWORD}
+*:*:*:postgres:${POSTGRES_PASSWORD}
+*:*:*:${POSTGRES_USER}:${POSTGRES_PASSWORD}
+EOF
+chmod 600 /var/lib/postgresql/.pgpass
+export PGPASSFILE="/var/lib/postgresql/.pgpass"
+
 cat <<EOF > /var/lib/postgresql/patroni.yml
 scope: hyperscale-postgres-cluster
 namespace: /service
@@ -53,15 +61,15 @@ bootstrap:
   post_bootstrap: /post-bootstrap.sh
 
   pg_hba:
-    - host all all 0.0.0.0/0 md5
     - host replication replicator 0.0.0.0/0 md5
+    - host all all 0.0.0.0/0 md5
     - host all all all trust
 postgresql:
   listen: 0.0.0.0:5432
   connect_address: ${PATRONI_CONNECT_HOST}:5432
   data_dir: ${PATRONI_DATA_DIR}
   bin_dir: /usr/local/bin
-  pgpass: /tmp/pgpass
+  pgpass: /var/lib/postgresql/.pgpass
   authentication:
     replication:
       username: replicator
