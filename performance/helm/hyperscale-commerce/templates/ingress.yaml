@@ -11,16 +11,17 @@ data:
   haproxy.cfg: |
     global
         log stdout format raw local0 info
-        maxconn 10000
+        maxconn 50000
 
     defaults
         log global
         mode http
         option httplog
         option dontlognull
-        timeout connect 3s
-        timeout client  30s
-        timeout server  30s
+        timeout connect 10s
+        timeout client  60s
+        timeout server  60s
+        timeout queue   30s
 
     peers mypeers
         peer ingress-0 ingress-0.haproxy-peers.{{ .Values.global.namespace }}.svc.cluster.local:1024

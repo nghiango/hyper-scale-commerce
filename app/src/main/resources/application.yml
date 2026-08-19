@@ -40,9 +40,9 @@ server:
   tomcat:
     threads:
       max: 200
-      min-spare: 10
-    accept-count: 100
-    max-connections: 10000
+      min-spare: 20
+    accept-count: 2000
+    max-connections: 20000
     connection-timeout: 20000
   compression:
     enabled: true
@@ -78,9 +78,9 @@ app:
       interval-ms: 3600000
       initial-delay-ms: 60000
   rate-limiting:
-    enabled: true
-    limit-per-minute: 60000
-    retry-after-seconds: 60
+    enabled: ${APP_RATE_LIMITING_ENABLED:false}
+    limit-per-minute: ${APP_RATE_LIMIT_PER_MINUTE:3000000}
+    retry-after-seconds: ${APP_RATE_LIMIT_RETRY_AFTER:60}
 
 management:
   endpoints:

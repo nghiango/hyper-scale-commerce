@@ -42,9 +42,9 @@ server:
   tomcat:
     threads:
       max: 200
-      min-spare: 10
-    accept-count: 100
-    max-connections: 10000
+      min-spare: 20
+    accept-count: 2000
+    max-connections: 20000
     connection-timeout: 20000
   compression:
     enabled: true
