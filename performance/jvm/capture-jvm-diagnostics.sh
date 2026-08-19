@@ -109,7 +109,7 @@ if [ "${MODE}" = "local" ]; then
   jcmd "${TARGET}" VM.system_properties >"${OUTPUT_DIR}/system-properties.raw.txt"
   jcmd "${TARGET}" Thread.print -l >"${OUTPUT_DIR}/thread-dump.txt"
   jcmd "${TARGET}" GC.heap_info >"${OUTPUT_DIR}/heap-info.txt"
-  jcmd "${TARGET}" GC.class_histogram >"${OUTPUT_DIR}/class-histogram.txt"
+  jcmd "${TARGET}" GC.class_histogram -all=true >"${OUTPUT_DIR}/class-histogram.txt"
   jcmd "${TARGET}" VM.native_memory summary >"${OUTPUT_DIR}/native-memory.txt" 2>&1 || true
   JFR_PATH="${OUTPUT_DIR}/recording.jfr"
   jcmd "${TARGET}" JFR.start name=phase18 settings=profile \
@@ -126,7 +126,7 @@ else
   "${kube_exec[@]}" jcmd 1 VM.system_properties >"${OUTPUT_DIR}/system-properties.raw.txt"
   "${kube_exec[@]}" jcmd 1 Thread.print -l >"${OUTPUT_DIR}/thread-dump.txt"
   "${kube_exec[@]}" jcmd 1 GC.heap_info >"${OUTPUT_DIR}/heap-info.txt"
-  "${kube_exec[@]}" jcmd 1 GC.class_histogram >"${OUTPUT_DIR}/class-histogram.txt"
+  "${kube_exec[@]}" jcmd 1 GC.class_histogram -all=true >"${OUTPUT_DIR}/class-histogram.txt"
   "${kube_exec[@]}" jcmd 1 VM.native_memory summary >"${OUTPUT_DIR}/native-memory.txt" 2>&1 || true
   "${kube_exec[@]}" jcmd 1 JFR.start name=phase18 settings=profile \
     "duration=${DURATION_SECONDS}s" "filename=${POD_JFR_PATH}" >/dev/null
