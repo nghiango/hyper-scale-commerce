@@ -11,6 +11,7 @@ global:
 ingress:
   enabled: true
   replicaCount: 2
+  rateLimit: 300000
   image:
     repository: haproxy
     tag: 2.9-alpine

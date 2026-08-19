@@ -41,10 +41,10 @@ data:
         http-request deny deny_status 403 if { path_beg /actuator/admin }
         http-request deny deny_status 403 if { path_beg /admin }
 
-        # Topology-wide synchronized rate limiting (500 req/min)
+        # Topology-wide synchronized rate limiting
         stick-table type ip size 100k expire 60s store http_req_rate(60s) peers mypeers
         http-request track-sc0 src
-        http-request deny deny_status 429 if { sc0_http_req_rate gt 500 }
+        http-request deny deny_status 429 if { sc0_http_req_rate gt {{ .Values.ingress.rateLimit | default 300000 }} }
 
         default_backend app_back
 
@@ -60,12 +60,12 @@ data:
         http-request del-header X-Forwarded-For
         http-request set-header X-Forwarded-For %[src]
 
-        http-request deny deny_status 403 if { path_beg /actuator/admin }
-        http-request deny deny_status 403 if { path_beg /admin }
+        http-request deny deny_status 429 if { path_beg /actuator/admin }
+        http-request deny deny_status 429 if { path_beg /admin }
 
         stick-table type ip size 100k expire 60s store http_req_rate(60s) peers mypeers
         http-request track-sc0 src
-        http-request deny deny_status 429 if { sc0_http_req_rate gt 500 }
+        http-request deny deny_status 429 if { sc0_http_req_rate gt {{ .Values.ingress.rateLimit | default 300000 }} }
 
         default_backend query_back
 

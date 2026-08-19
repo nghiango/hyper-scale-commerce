@@ -268,7 +268,7 @@ sample_resources() {
   : >"${output}"
   while :; do
     date -u +%FT%TZ >>"${output}"
-    kube top pods >>"${output}" 2>&1 || return 1
+    kube top pods >>"${output}" 2>&1 || true
     if ! kube get job "${job}" >/dev/null 2>&1; then return 0; fi
     if [ "$(kube get job "${job}" -o jsonpath='{.status.succeeded}' 2>/dev/null || true)" = "1" ] || \
        [ "$(kube get job "${job}" -o jsonpath='{.status.failed}' 2>/dev/null || true)" = "1" ]; then
