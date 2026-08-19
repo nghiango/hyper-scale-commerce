@@ -18,10 +18,14 @@ data:
         mode http
         option httplog
         option dontlognull
+        option http-server-close
+        option http-keep-alive
         timeout connect 10s
         timeout client  60s
         timeout server  60s
         timeout queue   30s
+        timeout http-keep-alive 60s
+        timeout http-request 10s
 
     peers mypeers
         peer ingress-0 ingress-0.haproxy-peers.{{ .Values.global.namespace }}.svc.cluster.local:1024
@@ -51,9 +55,10 @@ data:
 
     backend app_back
         balance roundrobin
+        http-reuse aggressive
         option httpchk GET /actuator/health/readiness
         http-check expect status 200
-        default-server inter 2s fall 2 rise 2
+        default-server inter 2s fall 2 rise 2 maxconn 10000
         server-template app 6 app-service.{{ .Values.global.namespace }}.svc.cluster.local:8080 check resolvers k8s init-addr none
 
     frontend query_front
@@ -61,8 +66,8 @@ data:
         http-request del-header X-Forwarded-For
         http-request set-header X-Forwarded-For %[src]
 
-        http-request deny deny_status 429 if { path_beg /actuator/admin }
-        http-request deny deny_status 429 if { path_beg /admin }
+        http-request deny deny_status 403 if { path_beg /actuator/admin }
+        http-request deny deny_status 403 if { path_beg /admin }
 
         stick-table type ip size 100k expire 60s store http_req_rate(60s) peers mypeers
         http-request track-sc0 src
@@ -72,9 +77,10 @@ data:
 
     backend query_back
         balance roundrobin
+        http-reuse aggressive
         option httpchk GET /actuator/health/readiness
         http-check expect status 200
-        default-server inter 2s fall 2 rise 2
+        default-server inter 2s fall 2 rise 2 maxconn 10000
         server-template order-query 6 order-query-service.{{ .Values.global.namespace }}.svc.cluster.local:8081 check resolvers k8s init-addr none
 
     resolvers k8s

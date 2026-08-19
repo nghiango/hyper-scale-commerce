@@ -25,11 +25,11 @@ ingress:
     statsNodePort: 30404
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
       cpu: 500m
       memory: 256Mi
+    limits:
+      cpu: 2000m
+      memory: 1024Mi
 
 # ---------------------------------------------------------------------------
 # Stateless Application Deployments
@@ -42,10 +42,10 @@ app:
     tag: 0.0.1-SNAPSHOT
   resources:
     requests:
-      cpu: 250m
+      cpu: 500m
       memory: 512Mi
     limits:
-      cpu: 1000m
+      cpu: 2000m
       memory: 1024Mi
   hpa:
     enabled: true
@@ -62,10 +62,10 @@ orderQuery:
     tag: 0.0.1-SNAPSHOT
   resources:
     requests:
-      cpu: 250m
+      cpu: 500m
       memory: 512Mi
     limits:
-      cpu: 1000m
+      cpu: 2000m
       memory: 1024Mi
   hpa:
     enabled: true
