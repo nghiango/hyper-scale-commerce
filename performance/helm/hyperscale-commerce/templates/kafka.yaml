@@ -130,6 +130,8 @@ spec:
               value: "3"
             - name: KAFKA_MIN_INSYNC_REPLICAS
               value: "2"
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xms768m -Xmx768m -XX:+UseG1GC"
             - name: CLUSTER_ID
               value: "5L6g3nShT-eMCtK--X86sw"
           readinessProbe:

@@ -87,11 +87,11 @@ kafka:
     size: 5Gi
   resources:
     requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 1000m
+      cpu: 500m
       memory: 1024Mi
+    limits:
+      cpu: 2000m
+      memory: 2048Mi
 
 etcd:
   enabled: true
