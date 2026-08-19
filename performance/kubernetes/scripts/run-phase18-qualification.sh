@@ -181,6 +181,27 @@ query_primary() {
   kube exec "${PRIMARY_POD}" -- psql -U hyperscale -d hyperscale -t -A -c "$1"
 }
 
+ensure_catalog_seed() {
+  local product_count
+  product_count="$(query_primary 'SELECT COUNT(*) FROM catalog.products;' 2>/dev/null || echo "0")"
+  if [ "${product_count:-0}" -lt 1000 ]; then
+    echo "Seeding catalog products in PostgreSQL..."
+    kube exec "${PRIMARY_POD}" -- psql -U hyperscale -d hyperscale -c "
+      INSERT INTO catalog.products (sku, name, description, price, availability, created_at, updated_at)
+      SELECT
+        'PERF-SKU-' || lpad(g::text, 5, '0'),
+        'Performance Product ' || g || ' with ' || (ARRAY['Alpha','Bravo','Charlie','Delta','Echo','Foxtrot','Golf','Hotel','India','Juliet'])[((g - 1) % 10) + 1],
+        'A performance test product for load testing',
+        1000 + (g % 1000),
+        'IN_STOCK',
+        now(),
+        now()
+      FROM generate_series(1, 1000) g
+      ON CONFLICT (sku) DO NOTHING;
+    " >/dev/null
+  fi
+}
+
 kafka_topic_count() {
   local topic="$1" output
   output="$(kube exec "${KAFKA_POD}" -- kafka-get-offsets \
@@ -362,6 +383,7 @@ run_scenario() {
 }
 
 discover_database_pods
+ensure_catalog_seed
 KAFKA_POD="$(kube get pods -l app.kubernetes.io/component=kafka -o jsonpath='{.items[0].metadata.name}')"
 DLQ_BEFORE="$(kafka_topic_count order-placed-dlq)"
 reset_orders

@@ -9,7 +9,7 @@ import org.springframework.jdbc.core.namedparam.SqlParameterSource
 import org.springframework.stereotype.Component
 
 @Component
-@Profile("local")
+@Profile("local", "kubernetes", "perf", "default", "!test")
 class CatalogLocalSeedData(jdbcTemplate: JdbcTemplate) : CommandLineRunner {
   private val namedTemplate = NamedParameterJdbcTemplate(jdbcTemplate)
 
