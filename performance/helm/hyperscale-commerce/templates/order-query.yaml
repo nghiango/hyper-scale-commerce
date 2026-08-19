@@ -113,21 +113,21 @@ spec:
               port: 8081
             initialDelaySeconds: 10
             periodSeconds: 3
-            failureThreshold: 20
+            failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /actuator/health/readiness
               port: 8081
-            periodSeconds: 3
-            timeoutSeconds: 2
-            failureThreshold: 2
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 3
           livenessProbe:
             httpGet:
               path: /actuator/health/liveness
               port: 8081
-            periodSeconds: 5
-            timeoutSeconds: 2
-            failureThreshold: 3
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             {{- toYaml .Values.orderQuery.resources | nindent 12 }}
       volumes:

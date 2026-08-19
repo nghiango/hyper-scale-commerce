@@ -200,15 +200,20 @@ spec:
             - name: peers
               containerPort: 1024
           readinessProbe:
-            tcpSocket:
-              port: 8080
+            httpGet:
+              path: /stats
+              port: 8404
             initialDelaySeconds: 2
-            periodSeconds: 3
-          livenessProbe:
-            tcpSocket:
-              port: 8080
-            initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /stats
+              port: 8404
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
           resources:
             {{- toYaml .Values.ingress.resources | nindent 12 }}
           volumeMounts:
