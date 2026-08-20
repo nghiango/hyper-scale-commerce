@@ -15,9 +15,9 @@ const JSON_HEADERS = {
 };
 
 export function getProductById(baseUrl, id) {
-  const url = `${baseUrl}/catalog/products/${id}`;
+  const url = http.url`${baseUrl}/catalog/products/${id}`;
   const res = http.get(url, {
-    tags: { endpoint: 'get_product_by_id' },
+    tags: { name: 'get_product_by_id', endpoint: 'get_product_by_id' },
     headers: { Accept: 'application/json' },
   });
 
@@ -33,9 +33,9 @@ export function getProductById(baseUrl, id) {
 }
 
 export function listProducts(baseUrl, page = 0, size = 20) {
-  const url = `${baseUrl}/catalog/products?page=${page}&size=${size}`;
+  const url = http.url`${baseUrl}/catalog/products?page=${page}&size=${size}`;
   const res = http.get(url, {
-    tags: { endpoint: 'list_products' },
+    tags: { name: 'list_products', endpoint: 'list_products' },
     headers: { Accept: 'application/json' },
   });
 
@@ -58,10 +58,10 @@ export function listProducts(baseUrl, page = 0, size = 20) {
 }
 
 export function postOrder(baseUrl, items) {
-  const url = `${baseUrl}/orders`;
+  const url = http.url`${baseUrl}/orders`;
   const payload = JSON.stringify({ items });
   const res = http.post(url, payload, {
-    tags: { endpoint: 'post_orders' },
+    tags: { name: 'post_orders', endpoint: 'post_orders' },
     headers: JSON_HEADERS,
   });
 
@@ -94,14 +94,14 @@ export function postOrder(baseUrl, items) {
 }
 
 export function postOrderWithKey(baseUrl, items, idempotencyKey) {
-  const url = `${baseUrl}/orders`;
+  const url = http.url`${baseUrl}/orders`;
   const payload = JSON.stringify({ items });
   const headers = Object.assign({}, JSON_HEADERS);
   if (idempotencyKey) {
     headers['Idempotency-Key'] = idempotencyKey;
   }
   const res = http.post(url, payload, {
-    tags: { endpoint: 'post_orders' },
+    tags: { name: 'post_orders', endpoint: 'post_orders' },
     headers: headers,
   });
 
@@ -134,8 +134,8 @@ export function postOrderWithKey(baseUrl, items, idempotencyKey) {
 }
 
 export function getOrderById(baseUrl, id, customTags = {}) {
-  const url = `${baseUrl}/orders/${id}`;
-  const tags = Object.assign({ endpoint: 'get_order_by_id' }, customTags);
+  const url = http.url`${baseUrl}/orders/${id}`;
+  const tags = Object.assign({ name: 'get_order_by_id', endpoint: 'get_order_by_id' }, customTags);
   const isPolling = !!customTags.polling;
 
   const params = {
@@ -162,9 +162,9 @@ export function getOrderById(baseUrl, id, customTags = {}) {
 }
 
 export function listOrders(baseUrl, page = 0, size = 20) {
-  const url = `${baseUrl}/orders?page=${page}&size=${size}`;
+  const url = http.url`${baseUrl}/orders?page=${page}&size=${size}`;
   const res = http.get(url, {
-    tags: { endpoint: 'list_orders' },
+    tags: { name: 'list_orders', endpoint: 'list_orders' },
     headers: { Accept: 'application/json' },
   });
 
