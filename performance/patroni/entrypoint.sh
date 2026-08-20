@@ -46,7 +46,10 @@ bootstrap:
       use_pg_rewind: true
       use_slots: true
       parameters:
-        max_connections: 300
+        max_connections: 1000
+        shared_buffers: 256MB
+        work_mem: 16MB
+        maintenance_work_mem: 64MB
         wal_level: replica
         max_wal_senders: 10
         max_replication_slots: 10
