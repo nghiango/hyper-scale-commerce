@@ -36,7 +36,7 @@ ingress:
 # ---------------------------------------------------------------------------
 app:
   enabled: true
-  replicaCount: 3
+  replicaCount: 5
   image:
     repository: hyperscale-commerce-app
     tag: 0.0.1-SNAPSHOT
@@ -56,7 +56,7 @@ app:
 
 orderQuery:
   enabled: true
-  replicaCount: 3
+  replicaCount: 5
   image:
     repository: hyperscale-commerce-order-query
     tag: 0.0.1-SNAPSHOT

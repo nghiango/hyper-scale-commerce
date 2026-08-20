@@ -59,7 +59,7 @@ data:
         option httpchk GET /actuator/health/readiness
         http-check expect status 200
         default-server inter 2s fall 2 rise 2 maxconn 10000
-        server-template app 6 app-service.{{ .Values.global.namespace }}.svc.cluster.local:8080 check resolvers k8s init-addr none
+        server-template app 10 app-service.{{ .Values.global.namespace }}.svc.cluster.local:8080 check resolvers k8s init-addr none
 
     frontend query_front
         bind *:8081
@@ -81,7 +81,7 @@ data:
         option httpchk GET /actuator/health/readiness
         http-check expect status 200
         default-server inter 2s fall 2 rise 2 maxconn 10000
-        server-template order-query 6 order-query-service.{{ .Values.global.namespace }}.svc.cluster.local:8081 check resolvers k8s init-addr none
+        server-template order-query 10 order-query-service.{{ .Values.global.namespace }}.svc.cluster.local:8081 check resolvers k8s init-addr none
 
     resolvers k8s
         nameserver dns 10.96.0.10:53

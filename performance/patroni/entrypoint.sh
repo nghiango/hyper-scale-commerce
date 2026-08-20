@@ -47,14 +47,18 @@ bootstrap:
       use_slots: true
       parameters:
         max_connections: 1000
-        shared_buffers: 256MB
-        work_mem: 16MB
+        shared_buffers: 512MB
+        work_mem: 32MB
         maintenance_work_mem: 64MB
         wal_level: replica
         max_wal_senders: 10
         max_replication_slots: 10
         hot_standby: "on"
         synchronous_commit: "on"
+        wal_writer_delay: 10ms
+        commit_delay: 50
+        commit_siblings: 5
+        checkpoint_completion_target: 0.9
         archive_mode: "on"
         archive_command: "/bin/true"
   initdb:

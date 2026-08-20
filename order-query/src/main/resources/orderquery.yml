@@ -41,10 +41,10 @@ server:
   forward-headers-strategy: framework
   tomcat:
     threads:
-      max: 200
-      min-spare: 20
-    accept-count: 2000
-    max-connections: 20000
+      max: 500
+      min-spare: 50
+    accept-count: 5000
+    max-connections: 30000
     connection-timeout: 20000
   compression:
     enabled: true
