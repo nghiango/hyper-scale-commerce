@@ -112,9 +112,10 @@ if [ "${MODE}" = "local" ]; then
   jcmd "${TARGET}" GC.class_histogram -all=true >"${OUTPUT_DIR}/class-histogram.txt"
   jcmd "${TARGET}" VM.native_memory summary >"${OUTPUT_DIR}/native-memory.txt" 2>&1 || true
   JFR_PATH="${OUTPUT_DIR}/recording.jfr"
-  jcmd "${TARGET}" JFR.start name=phase18 settings=profile \
-    "duration=${DURATION_SECONDS}s" "filename=${JFR_PATH}" >/dev/null
-  sleep "$((DURATION_SECONDS + 1))"
+  jcmd "${TARGET}" JFR.start name=phase18 settings=profile >/dev/null
+  sleep "${DURATION_SECONDS}"
+  jcmd "${TARGET}" JFR.dump name=phase18 filename="${JFR_PATH}" >/dev/null
+  jcmd "${TARGET}" JFR.stop name=phase18 >/dev/null
 else
   require_command kubectl
   kubectl --context "${CONTEXT}" -n "${NAMESPACE}" get pod "${TARGET}" >/dev/null
@@ -128,9 +129,10 @@ else
   "${kube_exec[@]}" jcmd 1 GC.heap_info >"${OUTPUT_DIR}/heap-info.txt"
   "${kube_exec[@]}" jcmd 1 GC.class_histogram -all=true >"${OUTPUT_DIR}/class-histogram.txt"
   "${kube_exec[@]}" jcmd 1 VM.native_memory summary >"${OUTPUT_DIR}/native-memory.txt" 2>&1 || true
-  "${kube_exec[@]}" jcmd 1 JFR.start name=phase18 settings=profile \
-    "duration=${DURATION_SECONDS}s" "filename=${POD_JFR_PATH}" >/dev/null
-  sleep "$((DURATION_SECONDS + 1))"
+  "${kube_exec[@]}" jcmd 1 JFR.start name=phase18 settings=profile >/dev/null
+  sleep "${DURATION_SECONDS}"
+  "${kube_exec[@]}" jcmd 1 JFR.dump name=phase18 filename="${POD_JFR_PATH}" >/dev/null
+  "${kube_exec[@]}" jcmd 1 JFR.stop name=phase18 >/dev/null
   kubectl --context "${CONTEXT}" -n "${NAMESPACE}" cp \
     "${TARGET}:${POD_JFR_PATH}" "${OUTPUT_DIR}/recording.jfr" -c "${CONTAINER}"
   "${kube_exec[@]}" rm -f "${POD_JFR_PATH}"
