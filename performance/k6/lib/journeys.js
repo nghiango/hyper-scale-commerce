@@ -20,7 +20,8 @@ let randGen = null;
 
 function getRand(config) {
   if (!randGen) {
-    randGen = pseudoRandom(config.prngSeed || 42);
+    const vuSeed = typeof __VU !== 'undefined' && __VU > 0 ? __VU * 10007 : 0;
+    randGen = pseudoRandom((config.prngSeed || 42) + vuSeed);
   }
   return randGen();
 }
