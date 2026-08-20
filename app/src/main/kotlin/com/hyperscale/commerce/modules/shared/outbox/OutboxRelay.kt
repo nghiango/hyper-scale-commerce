@@ -44,8 +44,10 @@ class OutboxRelay(
   }
 
   private fun publishBatch(dueEvents: List<OutboxEvent>): Boolean {
-    val publishedIds = ArrayList<Long>(dueEvents.size)
+    val publishedIds = java.util.Collections.synchronizedList(ArrayList<Long>(dueEvents.size))
     var continueProcessing = true
+    val futures = ArrayList<java.util.concurrent.CompletableFuture<*>>(dueEvents.size)
+
     for (event in dueEvents) {
       val eventContext = parseTraceContext(event.payload)
       val span = startOutboxSpan(eventContext)
@@ -57,35 +59,46 @@ class OutboxRelay(
       MDC.put(CorrelationIdFilter.SPAN_ID_MDC_KEY, span.context().spanId())
       val destinationTopic = resolveDestinationTopic(event.eventType)
       try {
-        kafkaTemplate
-            .send(destinationTopic, event.aggregateId, event.payload)
-            .get(PUBLISH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
-        publishedIds.add(event.id)
-        eventsPublished.increment()
-      } catch (exception: KafkaException) {
+        val sendFuture = kafkaTemplate.send(destinationTopic, event.aggregateId, event.payload)
+        val wrappedFuture = sendFuture.whenComplete { _, exception ->
+          try {
+            if (exception == null) {
+              publishedIds.add(event.id)
+              eventsPublished.increment()
+            } else {
+              logger.warn(
+                  "Failed to publish outbox event {} to topic {}", event.id, destinationTopic, exception)
+            }
+          } finally {
+            scope.close()
+            span.end()
+          }
+        }
+        futures.add(wrappedFuture)
+      } catch (exception: Exception) {
+        scope.close()
+        span.end()
         logger.warn(
-            "Failed to publish outbox event {} to topic {}", event.id, destinationTopic, exception)
-      } catch (exception: ExecutionException) {
-        logger.warn(
-            "Failed to publish outbox event {} to topic {}", event.id, destinationTopic, exception)
-      } catch (exception: TimeoutException) {
-        logger.warn(
-            "Timed out publishing outbox event {} to topic {}",
-            event.id,
-            destinationTopic,
-            exception)
-      } catch (exception: InterruptedException) {
-        Thread.currentThread().interrupt()
-        continueProcessing = false
-        break
+            "Failed to initiate publish for outbox event {} to topic {}", event.id, destinationTopic, exception)
       } finally {
         MDC.remove(CorrelationIdFilter.CORRELATION_ID_MDC_KEY)
         MDC.remove(CorrelationIdFilter.TRACE_ID_MDC_KEY)
         MDC.remove(CorrelationIdFilter.SPAN_ID_MDC_KEY)
-        scope.close()
-        span.end()
       }
     }
+
+    if (futures.isNotEmpty()) {
+      try {
+        java.util.concurrent.CompletableFuture.allOf(*futures.toTypedArray())
+            .get(PUBLISH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+      } catch (exception: InterruptedException) {
+        Thread.currentThread().interrupt()
+        continueProcessing = false
+      } catch (exception: Exception) {
+        logger.warn("Outbox batch publication encountered timeout or error", exception)
+      }
+    }
+
     if (publishedIds.isNotEmpty()) {
       outboxRepository.markPublished(publishedIds)
     }
