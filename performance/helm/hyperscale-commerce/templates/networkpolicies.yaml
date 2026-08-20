@@ -174,4 +174,24 @@ spec:
               app.kubernetes.io/component: ingress
       ports:
         - { protocol: TCP, port: 1024 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-traffic
+  namespace: {{ .Values.global.namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: ingress
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector: {}
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - { protocol: TCP, port: 8080 }
+        - { protocol: TCP, port: 8081 }
+        - { protocol: TCP, port: 8404 }
 {{- end }}
