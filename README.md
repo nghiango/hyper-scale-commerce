@@ -26,6 +26,7 @@ at `/swagger-ui.html`.
 - `docs/architecture.md` — current architecture
 - `docs/bootcamp/` — BootCamp phase definitions and plans
 - `docs/adr/` — architecture decision records
+- `docs/tutorials/linear-tickets-from-bootcamp-plans.md` — converting BootCamp phase plans into Linear projects and issues
 
 ## Prerequisites
 
