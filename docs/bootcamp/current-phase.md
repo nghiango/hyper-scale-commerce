@@ -8,7 +8,7 @@ Status: IN_PROGRESS
 
 Allowed technologies:
 
-- Kotlin
+- Java
 - Spring Boot
 - Gradle
 - PostgreSQL

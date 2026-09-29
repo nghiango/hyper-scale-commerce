@@ -1,17 +1,20 @@
 plugins {
-  kotlin("jvm") version "2.2.21"
-  kotlin("plugin.spring") version "2.2.21"
+  java
   id("org.springframework.boot") version "4.0.0"
   id("io.spring.dependency-management") version "1.1.7"
   id("com.diffplug.spotless") version "7.0.2"
-  id("io.gitlab.arturbosch.detekt") version "1.23.8"
+  checkstyle
 }
 
 group = "com.hyperscale.commerce"
 
 version = "0.0.1-SNAPSHOT"
 
-kotlin { jvmToolchain(21) }
+java {
+  toolchain {
+    languageVersion.set(JavaLanguageVersion.of(21))
+  }
+}
 
 repositories { mavenCentral() }
 
@@ -35,18 +38,19 @@ dependencies {
   implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9")
   implementation("net.logstash.logback:logstash-logback-encoder:8.0")
   implementation("org.flywaydb:flyway-database-postgresql")
-  implementation("org.jetbrains.kotlin:kotlin-reflect")
   runtimeOnly("org.postgresql:postgresql")
 
   testImplementation("org.springframework.boot:spring-boot-starter-test")
-
-  detekt("io.gitlab.arturbosch.detekt:detekt-cli:1.23.8")
-  detekt("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21")
 
   "integrationTestImplementation"("org.springframework.boot:spring-boot-starter-test")
   "integrationTestImplementation"("org.springframework.boot:spring-boot-testcontainers")
   "integrationTestImplementation"("org.testcontainers:junit-jupiter:1.21.3")
   "integrationTestImplementation"("org.testcontainers:postgresql:1.21.3")
+}
+
+checkstyle {
+  toolVersion = "10.21.4"
+  configFile = rootProject.file("config/checkstyle/checkstyle.xml")
 }
 
 tasks.register<Test>("integrationTest") {
@@ -66,6 +70,10 @@ tasks.withType<Test> {
 }
 
 spotless {
-  kotlin { ktfmt() }
-  kotlinGradle { ktfmt() }
+  java {
+    eclipse()
+    leadingTabsToSpaces(2)
+    trimTrailingWhitespace()
+    endWithNewline()
+  }
 }
