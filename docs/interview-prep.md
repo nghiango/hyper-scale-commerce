@@ -29,6 +29,9 @@ Interviewers trust "here is what we did and why" more than textbook definitions.
 14. [Known Gaps & Trade-offs in This Repo](#14-known-gaps--trade-offs-in-this-repo-be-ready-to-defend-or-improve)
 15. [Likely Deep-Dive / Follow-up Questions](#15-likely-deep-dive--follow-up-questions)
 16. [Behavioral Questions Anchored in This Project](#16-behavioral-questions-anchored-in-this-project)
+17. [Hands-on Java Coding Q&A](#17-hands-on-java-coding-qa)
+18. [Hands-on Spring, Kafka & SQL Q&A](#18-hands-on-spring-kafka--sql-qa)
+19. [Production Troubleshooting Playbook](#19-production-troubleshooting-playbook--how-do-you-narrow-down-and-identify-the-problem)
 
 ---
 
@@ -1637,3 +1640,795 @@ Use **STAR** (Situation, Task, Action, Result) and include numbers.
   runbooks linked from alerts, a definition of done that includes evidence, blameless postmortems.
 - **"What would you do differently?"** Choose one topic per aggregate from the start, scope idempotency
   keys per client, adopt OpenTelemetry export early, and tie HPA limits to the DB connection budget (§14).
+
+---
+
+## 17. Hands-on Java Coding Q&A
+
+Practical "show me the code" questions. The core Java snippets below were compiled and run on JDK 21
+(the outputs in comments are real).
+
+### 17.1 How do you handle (checked) exceptions inside a Stream?
+
+**Q: `Function`, `Predicate`, and the rest can't throw checked exceptions. What are your options?**
+A: There is no single right answer. Pick based on **whether one failure should abort the whole pipeline or
+be collected and reported**.
+
+**Option 1: Catch inside the lambda and rethrow unchecked.** The pipeline aborts on the first failure.
+Use a JDK unchecked wrapper when one exists (`UncheckedIOException`) so callers can still tell the cause.
+```java
+List<Integer> ids = lines.stream()
+    .map(s -> {
+      try {
+        return parse(s);                       // throws IOException
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);      // preserves the cause
+      }
+    })
+    .toList();
+```
+
+**Option 2: A reusable "throwing" functional interface + adapter.** This removes the try/catch noise from every
+lambda.
+```java
+@FunctionalInterface
+interface ThrowingFunction<T, R, E extends Exception> {
+  R apply(T t) throws E;
+
+  static <T, R> Function<T, R> unchecked(ThrowingFunction<T, R, ?> f) {
+    return t -> {
+      try {
+        return f.apply(t);
+      } catch (RuntimeException e) {
+        throw e;                                   // don't double-wrap
+      } catch (Exception e) {
+        throw new CompletionException(e);          // or a domain-specific unchecked exception
+      }
+    };
+  }
+}
+
+Stream.of("1", "x2").map(ThrowingFunction.unchecked(Snippets::parse)).toList();
+// → throws CompletionException, cause: java.io.IOException: bad x2
+```
+
+**Option 3: Don't abort. Collect successes *and* failures (a Result/Either type).** This is the best choice for batch jobs,
+imports, and event replays, where one bad record shouldn't kill the other 9,999.
+```java
+sealed interface Result<T> permits Result.Ok, Result.Err {
+  record Ok<T>(T value) implements Result<T> {}
+  record Err<T>(Object input, Exception error) implements Result<T> {}
+
+  static <T, R> Function<T, Result<R>> lift(ThrowingFunction<T, R, ?> f) {
+    return t -> {
+      try { return new Ok<>(f.apply(t)); }
+      catch (Exception e) { return new Err<>(t, e); }
+    };
+  }
+}
+
+Map<Boolean, List<Result<Integer>>> parts = Stream.of("1", "x2", "3")
+    .map(Result.<String, Integer>lift(Snippets::parse))
+    .collect(Collectors.partitioningBy(r -> r instanceof Result.Ok));
+// ok=2 err=1 → process the OKs, log/report/DLQ the Errs with their input
+```
+
+**Option 4: Skip failures (log and drop) with `mapMulti` (Java 16) or `flatMap(Optional)`.** Only do this when
+dropping is acceptable, and **always log or count** what was dropped.
+```java
+List<Integer> ok = Stream.of("1", "x2", "3").<Integer>mapMulti((s, sink) -> {
+  try { sink.accept(parse(s)); }
+  catch (IOException e) { log.warn("skip {}", s, e); skipped.increment(); }
+}).toList();                                    // [1, 3]
+```
+
+**Option 5: Use a plain `for` loop.** If the logic has checked exceptions, retries, or early exit,
+a loop is often the most readable choice. Streams are not a goal in themselves.
+
+Things to mention as a senior engineer:
+- **"Sneaky throw"** (a generics trick that rethrows a checked exception without declaring it) compiles, but it
+  hides checked exceptions from callers. Avoid it in application code.
+- Streams are **lazy**: the exception is thrown at the *terminal* operation, not where you wrote `.map(...)`. This often
+  surprises people when the stream is built in one method and consumed in another.
+- In **parallel streams**, an exception from any worker propagates to the caller, and the other tasks may still be
+  running or may already have produced side effects. Never rely on partial side effects.
+- `Files.lines(path)` must be closed (try-with-resources), and I/O errors during iteration surface as
+  `UncheckedIOException`.
+- Don't swallow `InterruptedException` inside lambdas. Restore the flag: `Thread.currentThread().interrupt()`.
+- Repo tie-in: a Kafka listener that throws goes to `DefaultErrorHandler` (retry with backoff, then DLQ). Exceptions
+  are the *signal*, so the projection code lets them propagate instead of catching them.
+
+### 17.2 How many ways can you implement a functional interface?
+
+**Q: Show every way to provide a `Predicate<String>` (or any SAM type), and how they differ.**
+A: Seven common ways:
+```java
+// 1. Lambda expression
+Predicate<String> isEmpty1 = s -> s.isEmpty();
+
+// 2. Method reference: four kinds
+Predicate<String> isEmpty2 = String::isEmpty;          // unbound instance method
+Function<String, Integer> parse = Integer::parseInt;    // static method
+Supplier<List<String>> factory = ArrayList::new;        // constructor
+Predicate<String> inSet = allowedSkus::contains;        // bound instance method (captures allowedSkus)
+
+// 3. Anonymous inner class
+Predicate<String> isEmpty3 = new Predicate<>() {
+  @Override public boolean test(String s) { return s.isEmpty(); }
+};
+
+// 4. Named (top-level / nested) class or record: reusable, testable, can hold config
+record MinLength(int min) implements Predicate<String> {
+  public boolean test(String s) { return s.length() >= min; }
+}
+Predicate<String> min3 = new MinLength(3);
+
+// 5. Enum implementing the interface: a closed set of strategies
+enum Discount implements UnaryOperator<Integer> {
+  NONE { public Integer apply(Integer p) { return p; } },
+  HALF { public Integer apply(Integer p) { return p / 2; } }
+}
+
+// 6. Composition via default/static methods: build new functions from existing ones
+Predicate<String> valid = min3.and(Predicate.not(String::isBlank)).or(isEmpty1);
+Function<Integer, Integer> plus1 = x -> x + 1;
+plus1.andThen(x -> x * 2).apply(3);              // (3+1)*2 = 8
+plus1.compose((Integer x) -> x * 2).apply(3);    // (3*2)+1 = 7
+Comparator<Order> cmp = Comparator.comparing(Order::status).thenComparing(Order::total, Comparator.reverseOrder());
+
+// 7. Higher-order factory method that returns a lambda (closure over parameters)
+static Predicate<Order> totalAbove(int threshold) { return o -> o.total() > threshold; }
+```
+Differences interviewers look for:
+- **`this`**: inside a lambda, `this` is the *enclosing* instance. Inside an anonymous class, it is the anonymous
+  object itself. Lambdas don't introduce a new scope, so you can't redeclare an enclosing local variable's name.
+- **Captured variables** must be *effectively final*, for both lambdas and anonymous classes (Java 8+).
+- **Identity and allocation**: non-capturing lambdas are typically singletons (created once via `invokedynamic` /
+  `LambdaMetafactory`). Capturing lambdas allocate per evaluation. Anonymous classes create a `.class` file
+  and allocate a new instance every time.
+- **State**: a named class, record, or enum can carry configuration and be unit-tested and reused. Lambdas
+  are best for short, one-off behavior.
+- **Checked exceptions**: you can declare your own SAM type with `throws` (see `ThrowingFunction` above).
+- **Serialization**: lambdas are serializable only if the target type is (`(Predicate<String> & Serializable) s -> …`),
+  and it is fragile. Avoid it.
+- `@FunctionalInterface` is optional, but it makes the compiler reject a second abstract method. `default`, `static`,
+  and `Object` methods (`equals`) don't count.
+
+### 17.3 Unmodifiable vs immutable collections — when and which?
+
+**Q: What's the difference between `Collections.unmodifiableList`, `List.of`, `List.copyOf`, `Stream.toList()`,
+`Collectors.toList()`, and `Arrays.asList`?**
+A:
+| API | Modifiable? | Nulls? | Backed by source? | Notes |
+|---|---|---|---|---|
+| `new ArrayList<>(src)` | yes | yes | no (copy) | default mutable list |
+| `Collections.unmodifiableList(src)` | no (UOE) | yes | **yes — a read-only *view*** | changes to `src` are visible through the view |
+| `List.of(...)` | no | **no (NPE)** | no | even `contains(null)` throws NPE. Compact, value-based |
+| `List.copyOf(src)` | no | **no (NPE)** | no (copy, or returns `src` if it's already an immutable copy) | the go-to defensive copy |
+| `Stream.toList()` (16+) | no | **yes** | no | unmodifiable but **allows null** |
+| `Collectors.toList()` | *unspecified* (ArrayList today) | yes | no | don't rely on mutability. Use `toCollection(ArrayList::new)` if you need it |
+| `Collectors.toUnmodifiableList()` | no | **no (NPE)** | no | |
+| `Arrays.asList(arr)` | **fixed-size**: `set` works, `add`/`remove` throw UOE | yes | **yes — writes through to the array** | |
+| `Map.of(k1,v1,…)` / `Map.ofEntries` | no | no | no | duplicate keys → `IllegalArgumentException`. Iteration order is unspecified |
+
+Verified behavior:
+```java
+List<String> backing = new ArrayList<>(List.of("a"));
+List<String> view = Collections.unmodifiableList(backing);
+backing.add("b");
+view;                                  // [a, b]  ← the "unmodifiable" view changed!
+List<String> copy = List.copyOf(backing);
+backing.add("c");
+copy;                                  // [a, b]  ← a true snapshot
+
+List.of("a").contains(null);           // NullPointerException
+Stream.of("a", null).toList();         // [a, null] (ok)
+Stream.of("a", null).collect(Collectors.toUnmodifiableList()); // NullPointerException
+String[] arr = {"a", "b"};
+Arrays.asList(arr).set(0, "z");        // arr[0] is now "z"
+```
+**When to use what:**
+- **Return internal state from a class or API**: return `List.copyOf(internal)` (a snapshot) or
+  `Collections.unmodifiableList(internal)` (cheap live view, when callers *should* see updates and you
+  control all writers). Never return the mutable field itself.
+- **Record components / value objects**: defensive copy in the compact constructor, so the record is really immutable:
+  ```java
+  record OrderLine(String sku, List<String> tags) {
+    OrderLine {
+      Objects.requireNonNull(sku, "sku");
+      tags = List.copyOf(tags);      // later changes to the caller's list don't leak in
+    }
+  }
+  ```
+- **Constants and config**: `List.of`, `Set.of`, `Map.of`, which are compact and safe to share.
+- **Shared across threads / cached values** (e.g. DTOs in `NearCache`, which are handed to many request threads at once):
+  use immutable collections, so there are no data races and no "someone mutated the cached object" bugs.
+- **You need to build then freeze**: build with `ArrayList`/`HashMap` locally, then `List.copyOf` at the
+  boundary.
+- **You need nulls**: avoid `List.of`/`copyOf`. Better still, avoid nulls in collections.
+- **Caveats**: immutability is **shallow**, since the elements themselves may be mutable. Don't rely on `Set.of`/`Map.of`
+  iteration order (it is randomized per JVM run). Unmodifiable ≠ thread-safe for a *view* whose backing list
+  is mutated concurrently.
+
+### 17.4 Collectors pitfalls you should know by heart
+
+```java
+// toMap with duplicate keys → IllegalStateException: Duplicate key
+Stream.of("a", "a").collect(Collectors.toMap(s -> s, s -> 1));            // throws
+// fix: provide a merge function (and optionally the map type)
+Stream.of("a", "a", "b").collect(Collectors.toMap(s -> s, s -> 1, Integer::sum, TreeMap::new)); // {a=2, b=1}
+// toMap with a null value → NullPointerException (HashMap.merge rejects null)
+Stream.of("a").collect(Collectors.toMap(s -> s, s -> (Integer) null));   // throws
+
+// groupingBy + downstream collectors
+Map<String, Long> byStatus = orders.stream()
+    .collect(Collectors.groupingBy(Order::status, TreeMap::new, Collectors.counting()));
+// {CANCELLED=1, PLACED=2}
+
+// partitioningBy always has both keys (true/false), even if empty
+// teeing (Java 12): two collectors in one pass
+String stats = orders.stream().collect(Collectors.teeing(
+    Collectors.counting(), Collectors.summingInt(Order::total), (count, sum) -> count + "/" + sum)); // "3/22"
+```
+
+### 17.5 Map idioms: counting, multimaps, compute*
+
+```java
+Map<String, Integer> counts = new HashMap<>();
+for (String w : words) counts.merge(w, 1, Integer::sum);          // word count, no containsKey dance
+
+Map<String, List<Integer>> multi = new HashMap<>();
+multi.computeIfAbsent("k", k -> new ArrayList<>()).add(1);         // multimap
+
+map.getOrDefault(key, 0);                                           // read with default
+map.putIfAbsent(key, value);                                        // insert only if missing
+```
+In `ConcurrentHashMap`, `merge`/`compute*` are atomic per key. In `HashMap` they are not thread-safe at all.
+
+### 17.6 Implement an LRU cache in 10 lines
+
+```java
+final class LruCache<K, V> extends LinkedHashMap<K, V> {
+  private final int capacity;
+  LruCache(int capacity) { super(16, 0.75f, true); this.capacity = capacity; } // accessOrder = true
+  @Override protected boolean removeEldestEntry(Map.Entry<K, V> eldest) { return size() > capacity; }
+}
+// put 1, put 2, get 1, put 3 → keys [1, 3] (2 was least recently used)
+```
+Follow-ups: it is not thread-safe (wrap it in `Collections.synchronizedMap` or use a lock). In production use **Caffeine**
+(W-TinyLFU, concurrent, TTL, metrics), which is what this repo does.
+
+### 17.7 Implement a token-bucket rate limiter
+
+```java
+final class TokenBucket {
+  private final long capacity;
+  private final double refillPerNano;
+  private double tokens;
+  private long lastRefill;
+
+  TokenBucket(long capacity, long refillPerSecond) {
+    this.capacity = capacity;
+    this.refillPerNano = refillPerSecond / 1_000_000_000.0;
+    this.tokens = capacity;
+    this.lastRefill = System.nanoTime();          // monotonic clock, never currentTimeMillis
+  }
+
+  synchronized boolean tryAcquire() {
+    long now = System.nanoTime();
+    tokens = Math.min(capacity, tokens + (now - lastRefill) * refillPerNano);   // lazy refill
+    lastRefill = now;
+    if (tokens >= 1) { tokens -= 1; return true; }
+    return false;
+  }
+}
+// capacity 2, 1 token/s: true, true, false
+```
+Talking points: lazy refill (no background thread), the monotonic clock, `synchronized` (simple; under high contention
+use CAS or striping), one bucket per client in a `Caffeine` cache with expiry (like `ClientRateLimitFilter`),
+and for a cluster-wide limit, the same algorithm as an atomic **Redis Lua** script.
+
+### 17.8 Concurrency: run calls in parallel with timeouts and fallbacks
+
+```java
+ExecutorService io = Executors.newFixedThreadPool(4);       // dedicated pool for blocking I/O, not commonPool
+try {
+  CompletableFuture<String> a = CompletableFuture.supplyAsync(() -> callA(), io);
+  CompletableFuture<String> b = CompletableFuture.supplyAsync(() -> callB(), io)
+      .completeOnTimeout("B-fallback", 100, TimeUnit.MILLISECONDS);         // per-call timeout + fallback
+  CompletableFuture<String> c = CompletableFuture.supplyAsync(() -> callC(), io)
+      .exceptionally(ex -> "C-fallback(" + ex.getCause().getMessage() + ")"); // ex is a CompletionException
+  String result = a.thenCombine(b, String::concat).thenCombine(c, String::concat)
+      .get(1, TimeUnit.SECONDS);                                              // overall deadline
+} finally {
+  io.shutdown();                                         // proper shutdown: stop accepting work
+  if (!io.awaitTermination(5, TimeUnit.SECONDS)) io.shutdownNow();
+}
+```
+Pitfalls: `orTimeout` / `completeOnTimeout` don't cancel the underlying work (the thread keeps running), exceptions
+are wrapped in `CompletionException`, and an unbounded `newCachedThreadPool` under load creates unlimited threads.
+
+### 17.9 try-with-resources and suppressed exceptions
+
+```java
+try (var conn = dataSource.getConnection(); var ps = conn.prepareStatement(sql)) {
+  // resources close in reverse order, even on exception
+}
+// If the body throws AND close() throws, the body's exception wins and close()'s is attached:
+//   e.getMessage() → "body failed", e.getSuppressed()[0] → "close failed"
+```
+Never `return` from `finally` (it silently discards exceptions), and don't catch `Throwable`/`Error` unless you rethrow.
+
+### 17.10 Money, dates, and equality traps
+
+```java
+new BigDecimal("1.0").equals(new BigDecimal("1.00"));        // false: equals compares scale
+new BigDecimal("1.0").compareTo(new BigDecimal("1.00")) == 0; // true:  use compareTo for value equality
+new BigDecimal(0.1);       // 0.1000000000000000055511151231257827021181583404541015625
+BigDecimal.valueOf(0.1);   // 0.1 → always construct from String or valueOf, never from a double
+```
+- Never use `double` for money. Use `BigDecimal` with an explicit `RoundingMode`, or **integer minor units**. This repo's
+  `Money` record wraps an `int` amount (validated `0..1_000_000_000`) and the DB column is
+  `price INTEGER CHECK (price >= 0)`.
+- Time: store **`Instant`** / `TIMESTAMPTZ` (UTC) and convert to a zone only for display. `LocalDateTime` has no zone,
+  so it is ambiguous across DST and regions. Inject a `java.time.Clock` so time-dependent code (TTL, expiry,
+  idempotency `expires_at`) is testable.
+- `Integer` caching: `Integer.valueOf(127) == Integer.valueOf(127)` is true, but `128 == 128` boxed is false. Always
+  use `equals` for boxed types.
+
+### 17.11 Modern Java: sealed types + pattern matching
+
+```java
+sealed interface Result<T> permits Result.Ok, Result.Err { /* records as above */ }
+
+String describe(Result<Integer> r) {
+  return switch (r) {                                    // exhaustive: no default needed
+    case Result.Ok<Integer>(Integer v) when v > 3 -> "big " + v;   // record pattern + guard
+    case Result.Ok<Integer> ok                    -> "ok " + ok.value();
+    case Result.Err<Integer> err                  -> "err " + err.error().getMessage();
+  };
+}
+```
+If someone adds a new permitted subtype, every non-exhaustive `switch` **fails to compile**. That is the main
+benefit compared to `instanceof` chains. Repo example: `IdempotencyDecision` (`Proceed` | `Replay`).
+
+### 17.12 Sorting with nulls and multiple keys
+
+```java
+names.sort(Comparator.nullsLast(Comparator.naturalOrder()));       // [a, b, null]
+orders.sort(Comparator.comparing(Order::status)
+    .thenComparing(Order::createdAt, Comparator.reverseOrder())
+    .thenComparingLong(Order::id));                                 // deterministic tie-breaker
+```
+Always add a unique tie-breaker when the sort feeds pagination. The repo's `listOrders` orders by
+`created_at DESC, order_id DESC` for this reason.
+
+### 17.13 Thread-safe lazy singleton
+
+```java
+final class ExpensiveClient {
+  private ExpensiveClient() {}
+  private static final class Holder { static final ExpensiveClient INSTANCE = new ExpensiveClient(); }
+  static ExpensiveClient get() { return Holder.INSTANCE; }   // lazy + thread-safe via class init, no locks
+}
+```
+In Spring, you almost never need this: a singleton bean is created once by the container.
+
+### 17.14 Producer–consumer with backpressure
+
+```java
+BlockingQueue<Event> queue = new ArrayBlockingQueue<>(1_000);   // bounded = backpressure
+// producer
+if (!queue.offer(event, 50, TimeUnit.MILLISECONDS)) {
+  rejected.increment();                                         // shed or fail fast, don't block forever
+}
+// consumer thread
+while (!Thread.currentThread().isInterrupted()) {
+  Event e = queue.poll(1, TimeUnit.SECONDS);
+  if (e != null) handle(e);
+}
+```
+Use a bounded queue, timeouts on `offer`/`poll`, a rejection metric, and shutdown via interrupt. In this system Kafka
+plays this role *between* services, and the outbox table plays it between the DB and Kafka.
+
+---
+## 18. Hands-on Spring, Kafka & SQL Q&A
+
+### 18.1 Consistent API errors with `ProblemDetail` (RFC 9457)
+
+```java
+@RestControllerAdvice
+class ApiErrorHandler {
+  @ExceptionHandler(IdempotencyConflictException.class)
+  ProblemDetail conflict(IdempotencyConflictException ex) {
+    ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+    pd.setTitle("Request already in progress");
+    pd.setProperty("correlationId", MDC.get("correlationId"));   // lets support find the logs
+    return pd;
+  }
+
+  @ExceptionHandler(Exception.class)
+  ProblemDetail unexpected(Exception ex) {
+    log.error("Unhandled error", ex);                            // log once, here, with the stack trace
+    return ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error"); // no internals leaked
+  }
+}
+```
+Talking points: map domain exceptions to stable status codes (the repo uses 400 / 409 / 422 / 500), never leak stack
+traces or SQL, include a correlation ID, and log server errors once at the boundary, not at every layer.
+
+### 18.2 Make `@Transactional` roll back on checked exceptions
+
+```java
+@Transactional(rollbackFor = Exception.class)       // the default only rolls back on RuntimeException/Error
+public void importCatalog(Path file) throws IOException { ... }
+```
+
+### 18.3 Run side effects only *after* the transaction commits
+
+Evicting a cache or calling an external system *inside* the transaction is a bug: if the transaction rolls back, the
+side effect already happened. If the cache is refilled before the commit, it caches the old value.
+```java
+@Transactional
+public void updatePrice(long id, int price) {
+  repository.updatePrice(id, price);
+  events.publishEvent(new ProductChanged(id));       // ApplicationEventPublisher
+}
+
+@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+void onProductChanged(ProductChanged e) {
+  catalogService.evictProduct(e.id());               // runs only if the commit succeeded
+}
+```
+For events that *must not be lost*, use the outbox instead. `AFTER_COMMIT` listeners run in memory and are lost if the
+pod dies right after the commit.
+
+### 18.4 Idempotent Kafka consumer with an inbox table — and the ack-ordering trap
+
+```sql
+CREATE TABLE billing.processed_events (event_id VARCHAR(100) PRIMARY KEY, processed_at TIMESTAMPTZ DEFAULT now());
+```
+```java
+@Service
+class BillingHandler {
+  @Transactional
+  public void handle(OrderPlaced e) {
+    int inserted = jdbc.update(
+        "INSERT INTO billing.processed_events (event_id) VALUES (?) ON CONFLICT DO NOTHING", e.eventId());
+    if (inserted == 0) return;                // duplicate delivery → no-op
+    createInvoice(e);                          // side effect in the SAME transaction as the dedup row
+  }
+}
+
+@KafkaListener(topics = "order-placed", groupId = "billing")
+void onMessage(String json, Acknowledgment ack) {
+  billingHandler.handle(parse(json));          // transaction commits when this returns
+  ack.acknowledge();                           // ack AFTER the commit
+}
+```
+**Trap:** with `AckMode.MANUAL_IMMEDIATE`, calling `ack.acknowledge()` *inside* a `@Transactional` listener method
+commits the Kafka offset **before** the DB transaction commits. If the DB commit then fails, the offset has already
+moved and the message is lost. Keep the transaction in a separate bean and acknowledge after it returns. That is how
+this repo's projections are structured: DB write first, then `acknowledgment.acknowledge()` last.
+
+### 18.5 Retry and DLQ configuration (from the repo)
+
+```java
+ExponentialBackOffWithJitter backOff = new ExponentialBackOffWithJitter(3);   // 3 retries
+backOff.setInitialInterval(200); backOff.setMultiplier(2.0); backOff.setMaxInterval(2000);  // ±50% jitter
+DefaultErrorHandler handler = new DefaultErrorHandler(
+    new DeadLetterPublishingRecoverer(kafkaTemplate,
+        (record, ex) -> new TopicPartition(record.topic() + "-dlq", record.partition())), backOff);
+handler.addNotRetryableExceptions(JacksonException.class, IllegalArgumentException.class);   // poison → DLQ now
+factory.setCommonErrorHandler(handler);
+```
+
+### 18.6 Testing slices and real infrastructure
+
+```java
+@WebMvcTest(OrderController.class)                       // web layer only: fast
+class OrderControllerTest {
+  @Autowired MockMvc mvc;
+  @MockitoBean OrderService orderService;                // Spring Framework 6.2+ (replaces @MockBean)
+  @MockitoBean IdempotencyService idempotencyService;
+
+  @Test void rejectsInvalidBody() throws Exception {
+    mvc.perform(post("/orders").contentType(APPLICATION_JSON).content("{\"items\":[]}"))
+       .andExpect(status().isBadRequest());
+  }
+}
+
+@SpringBootTest
+@Testcontainers
+class OutboxIntegrationTest {
+  @Container @ServiceConnection static PostgreSQLContainer<?> pg = new PostgreSQLContainer<>("postgres:16");
+  @Container @ServiceConnection static KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("apache/kafka"));
+
+  @Test void orderEventuallyPublished() {
+    long id = orderService.createOrder(items).id();
+    await().atMost(Duration.ofSeconds(10))
+           .until(() -> outboxRepository.isPublished(id));     // poll with a deadline, never Thread.sleep
+  }
+}
+```
+`@ServiceConnection` (Boot 3.1+) wires the container's URL and credentials into the auto-configuration, so no
+`@DynamicPropertySource` boilerplate is needed.
+
+### 18.7 SQL you should be able to write on a whiteboard
+
+```sql
+-- Duplicates (e.g. double-processed reservations)
+SELECT event_id, sku, count(*) FROM inventory.reservations
+GROUP BY event_id, sku HAVING count(*) > 1;
+
+-- Top-N per group: latest 3 orders per status
+SELECT * FROM (
+  SELECT o.*, row_number() OVER (PARTITION BY status ORDER BY created_at DESC, order_id DESC) AS rn
+  FROM order_query.order_read_model o
+) t WHERE rn <= 3;
+
+-- Keyset pagination (stable and O(log n), unlike OFFSET)
+SELECT order_id, status, created_at FROM order_query.order_read_model
+WHERE (created_at, order_id) < (:lastCreatedAt, :lastOrderId)
+ORDER BY created_at DESC, order_id DESC
+LIMIT 20;
+
+-- Version-guarded upsert (the repo's projection pattern): idempotent + out-of-order safe
+INSERT INTO order_query.order_read_model (order_id, status, items, version, created_at)
+VALUES (:id, :status, :items::jsonb, :version, :createdAt)
+ON CONFLICT (order_id) DO UPDATE
+  SET status = EXCLUDED.status, items = EXCLUDED.items, version = EXCLUDED.version, updated_at = now()
+  WHERE order_query.order_read_model.version <= EXCLUDED.version;
+
+-- Atomic conditional decrement (no oversell, no SELECT-then-UPDATE race)
+UPDATE inventory.stock SET available = available - :qty
+WHERE sku = :sku AND available >= :qty;          -- 0 rows updated → out of stock
+
+-- Work queue claim (the outbox pattern)
+SELECT id FROM "order".outbox_events
+WHERE published_at IS NULL ORDER BY created_at LIMIT 500
+FOR UPDATE SKIP LOCKED;
+```
+
+### 18.8 Kafka CLI you'll actually use
+
+```bash
+# Consumer lag per partition (LAG column) and which member owns each partition
+kafka-consumer-groups --bootstrap-server kafka:9092 --describe --group order-query
+
+# Topic health: leader, replicas, ISR (ISR < min.insync.replicas → producers fail with acks=all)
+kafka-topics --bootstrap-server kafka:9092 --describe --topic order-placed
+
+# Peek at messages with keys and headers (find events for one order)
+kafka-console-consumer --bootstrap-server kafka:9092 --topic order-placed-dlq --from-beginning \
+  --property print.key=true --property print.headers=true --max-messages 20
+
+# Rewind a group (the group must be stopped). Dry-run first, then --execute
+kafka-consumer-groups --bootstrap-server kafka:9092 --group order-query --topic order-placed \
+  --reset-offsets --to-datetime 2026-10-26T00:00:00.000 --dry-run
+```
+(The Confluent image names the tools without `.sh`. Apache distributions use `kafka-consumer-groups.sh`.)
+
+---
+
+## 19. Production Troubleshooting Playbook — "How do you narrow down and identify the problem?"
+
+**Q: Something is wrong in production. Walk me through how you narrow it down.**
+A: Use a repeatable method rather than guessing. **Mitigate first, then find the root cause.**
+
+1. **Triage the impact (first 5 minutes).** What is the symptom: errors, latency, wrong data, or an outage? Who is affected:
+   all users, or one endpoint, tenant, region, or pod? Is it getting worse? This decides severity and whether to page more people.
+2. **Ask "what changed?"** Most incidents are caused by a change: a deploy, a config or feature flag, a traffic
+   shift (campaign, bot), a dependency (DB failover, Kafka broker loss, expired certificate), infrastructure (node drain,
+   autoscaling), or data (a new kind of payload, a huge customer). Line up the symptom start time against
+   deploy history (`kubectl rollout history`, the git-revision annotation), alerts, and change logs.
+3. **Narrow by dimension.** Split the golden signals by `uri`, `status`, `method`, `instance` (pod),
+   version, and node. *One pod bad* points to a node, noisy neighbor, bad cache, or GC. *One endpoint bad* points to its query
+   or dependency. *Everything bad* points to a shared dependency (DB, Kafka, Redis, network) or the ingress.
+4. **Narrow by layer (follow the request).** Edge (HAProxy 429s or 5xx?) → app (Tomcat threads, GC, CPU, errors in
+   logs) → dependencies (Hikari pending, DB wait events, Kafka lag, Redis timeouts). Find the **first layer
+   that looks unhealthy**. Upstream layers usually only show *symptoms* of the downstream problem.
+5. **Follow one concrete example.** Take one failing request's `X-Correlation-Id` / `traceId`, grep it across all
+   services' JSON logs, and reconstruct exactly what happened. One real trace beats ten dashboards.
+6. **Form a hypothesis and test it** with data (a query, a thread dump, a reproduction in staging). Change one thing at a time.
+7. **Mitigate**: roll back, disable the feature flag, scale out, shed load, fail over, or take the bad pod out of rotation.
+   Restore service first, and capture evidence (thread dumps, heap info, logs) *before* restarting, because restarts
+   destroy evidence.
+8. **Root cause and prevention**: use 5 Whys to get past "the DB was slow" to the real cause. Then write a blameless
+   postmortem with action items: an alert that would have caught it earlier, a test, a guardrail, a runbook update.
+
+> One-liner for interviews: *"Scope it, find what changed, split the metrics by dimension until one
+> pod/endpoint/dependency stands out, follow one real request end to end by correlation ID, mitigate
+> first, then prove the root cause with data and add a guardrail."*
+
+### 19.1 Toolbox (with commands for this repo)
+
+```bash
+NS=hyperscale
+# Pods, restarts, placement
+kubectl -n $NS get pods -l app.kubernetes.io/component=app -o wide
+kubectl -n $NS describe pod <pod>                 # Last State: OOMKilled / exit 137, probe failures, events
+kubectl -n $NS get events --sort-by=.lastTimestamp | tail -30
+kubectl -n $NS top pods                           # CPU/memory now (needs metrics-server)
+kubectl -n $NS rollout history deployment/app
+
+# Logs: JSON, so filter with jq. With a label selector, --tail defaults to 10, so set it explicitly
+kubectl -n $NS logs -l app.kubernetes.io/component=app --since=15m --tail=-1 \
+  | jq -Rc 'fromjson? | select(.correlationId=="<id>")'
+kubectl -n $NS logs <pod> --previous              # logs from the crashed container
+
+# JVM diagnostics inside the pod (the image is a full JDK; java runs as PID 1)
+kubectl -n $NS exec <pod> -c app -- jcmd 1 Thread.print -l > threads-1.txt
+kubectl -n $NS exec <pod> -c app -- jcmd 1 GC.heap_info
+kubectl -n $NS exec <pod> -c app -- jcmd 1 GC.class_histogram | head -30
+kubectl -n $NS exec <pod> -c app -- jcmd 1 VM.native_memory summary   # NMT is enabled in the Dockerfile
+kubectl -n $NS exec <pod> -c app -- jcmd 1 JFR.start duration=60s filename=/diagnostics/rec.jfr
+kubectl -n $NS cp <pod>:/diagnostics/rec.jfr ./rec.jfr -c app
+# or the repo wrapper:
+performance/jvm/capture-jvm-diagnostics.sh --pod <pod> --container app
+
+# Talk to one specific pod (bypass the load balancer)
+kubectl -n $NS port-forward pod/<pod> 18080:8080
+curl -s localhost:18080/actuator/health | jq
+curl -s localhost:18080/actuator/prometheus | grep -E 'hikaricp_connections_(active|pending)|outbox_relay_lag|kafka_consumer_lag'
+
+# Take a bad pod out of rotation but keep it for debugging: removing the selector label detaches it from
+# the Service and the ReplicaSet, which starts a fresh replacement
+kubectl -n $NS label pod <pod> app.kubernetes.io/component-
+```
+
+PromQL for narrowing:
+```promql
+# Which endpoints are failing?
+sum by (uri, status) (rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+# Is it one pod?
+topk(5, sum by (instance) (rate(http_server_requests_seconds_count{status=~"5.."}[5m])))
+# p95 per pod for one route (aggregate buckets first, then the quantile)
+histogram_quantile(0.95, sum by (le, instance) (rate(http_server_requests_seconds_bucket{uri="/orders/{id}"}[5m])))
+# Waiting on the DB pool?
+max by (instance, pool) (hikaricp_connections_pending)
+# GC pressure / CPU throttling
+rate(jvm_gc_pause_seconds_sum[5m])
+rate(container_cpu_cfs_throttled_periods_total[5m]) / rate(container_cpu_cfs_periods_total[5m])
+```
+
+PostgreSQL queries:
+```sql
+-- What is running right now, oldest transactions first (long transactions block VACUUM and hold locks)
+SELECT pid, now() - xact_start AS xact_age, state, wait_event_type, wait_event, client_addr, left(query, 120)
+FROM pg_stat_activity
+WHERE datname = 'hyperscale' AND state <> 'idle'
+ORDER BY xact_age DESC NULLS LAST LIMIT 20;
+
+-- Who is blocking whom
+SELECT pid, pg_blocking_pids(pid) AS blocked_by, wait_event, left(query, 120)
+FROM pg_stat_activity WHERE cardinality(pg_blocking_pids(pid)) > 0;
+
+-- Connections per client (pod IP) and state: is one pod hoarding connections? idle in transaction?
+SELECT client_addr, state, count(*) FROM pg_stat_activity GROUP BY 1, 2 ORDER BY 3 DESC;
+
+-- Top queries by total time (requires the pg_stat_statements extension)
+SELECT calls, round(total_exec_time) AS total_ms, round(mean_exec_time::numeric, 2) AS mean_ms, left(query, 100)
+FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 10;
+
+-- Bloat / vacuum health (the outbox is the usual suspect)
+SELECT relname, n_live_tup, n_dead_tup, last_autovacuum FROM pg_stat_user_tables ORDER BY n_dead_tup DESC LIMIT 10;
+
+-- Replication state (sync standby present? lag?)
+SELECT application_name, state, sync_state, replay_lag FROM pg_stat_replication;
+-- Last resort for a runaway session: SELECT pg_terminate_backend(<pid>);
+```
+
+### 19.2 Scenario: 5xx spike right after a deploy
+1. Confirm the correlation: the error start time matches the rollout, and errors appear only on new-revision pods (`topk by instance`).
+2. **Mitigate immediately**: `kubectl -n hyperscale rollout undo deployment/app`. `maxUnavailable: 0` keeps capacity during the rollback.
+3. Then diagnose from the logs of the bad revision: a new exception type? a config or env difference? a migration that the old code
+   can't handle (this is why migrations must be backward compatible)?
+4. Prevention: canary or progressive delivery with automatic rollback on SLO burn, plus a contract or integration test for the bug.
+
+### 19.3 Scenario: latency is high but CPU is low
+High latency with low CPU means threads are **waiting**, not working. Take 3 thread dumps about 5 s apart and group them by state and frame:
+- many threads in `HikariPool.getConnection` → **DB pool exhaustion** (see 19.6),
+- many in `SocketInputStream.read` / Lettuce → waiting on a slow dependency (Redis timeout 1 s, so check `RedisNodeDown`),
+- many `BLOCKED` on the same monitor → **lock contention** (find the owner thread in the dump),
+- `WAITING` in `CompletableFuture.get` → waiting on async work (e.g. the outbox relay waiting up to 10 s).
+Then confirm with metrics (`hikaricp_connections_pending`, dependency latency) and fix the slow dependency, not the symptom.
+
+### 19.4 Scenario: CPU at 100%
+1. Is it all pods (load increase → check RPS; scale out or shed) or one (a hot loop, a pathological input, GC)?
+2. GC? Check `rate(jvm_gc_pause_seconds_sum[5m])` and heap usage after GC. If the heap is nearly full, GC thrashes, so it's really a memory problem (19.5).
+3. Otherwise find the hot code: a 60 s JFR recording (Method Profiling / hot methods), or `top -H -p 1` in the container →
+   convert the thread ID to hex → find that `nid=0x…` in the thread dump. Typical causes: regex backtracking, JSON
+   (de)serialization of huge payloads, accidental O(n²) (for example scanning a 10k-entry cache key set on every invalidation),
+   busy-spin retries without backoff.
+4. Also check **CPU throttling**: with a 2-CPU limit, average CPU can look fine while the pod is throttled in bursts, which
+   adds latency.
+
+### 19.5 Scenario: memory keeps growing / pods get OOMKilled
+- First decide **which** OOM it is:
+  - `java.lang.OutOfMemoryError` in the logs → **heap**. The Dockerfile sets `-XX:+HeapDumpOnOutOfMemoryError
+    -XX:HeapDumpPath=/diagnostics/heapdump.hprof -XX:+ExitOnOutOfMemoryError`, so you get a dump and a clean restart.
+  - `kubectl describe pod` shows `OOMKilled` / exit code 137 with *no* Java OOM → the **container** limit (1 GiB) was hit by
+    heap + **native memory** (thread stacks, metaspace, direct buffers). `-XX:MaxRAMPercentage=75` leaves only ~256 MiB for
+    everything else. Check `jcmd 1 VM.native_memory summary` (NMT is enabled).
+- Heap leak workflow: compare two `GC.class_histogram` outputs taken minutes apart. The classes whose counts keep growing are
+  the suspects. Then open the heap dump in Eclipse MAT, look at the dominator tree, and follow the "path to GC roots". Usual
+  suspects: unbounded maps or caches, listeners or ThreadLocals never removed, huge result sets loaded into memory.
+- Mitigation while you investigate: increase the memory limit or lower `MaxRAMPercentage`, and restart on a schedule only as a stopgap.
+
+### 19.6 Scenario: DB connection pool exhaustion
+Symptoms: `Connection is not available, request timed out after 5000ms`, rising `hikaricp_connections_pending`,
+`HikariCpConnectionTimeout` firing, and latency pinned near 5 s.
+1. In `pg_stat_activity`: are connections `active` (slow queries → `pg_stat_statements` / `EXPLAIN (ANALYZE, BUFFERS)`),
+   `idle in transaction` (code holding a transaction open while doing I/O, e.g. an HTTP or Kafka call inside `@Transactional`), or
+   blocked (`pg_blocking_pids` → a lock chain, often a migration or a long batch job)?
+2. In the app's thread dump: who *holds* connections, i.e. which stack frames are inside JDBC calls?
+3. Mitigate: terminate the rogue sessions, roll back the offending change, temporarily shed degradable traffic.
+4. Fix: move I/O out of transactions, add indexes or fix queries, set `statement_timeout` / `idle_in_transaction_session_timeout`,
+   keep `REQUIRES_NEW` (2 connections per request) off hot paths, and re-check the pod × pool-size budget against `max_connections`.
+
+### 19.7 Scenario: "My order doesn't show up in GET /orders" (data flow investigation)
+Follow the data through each hop until you find where it stopped:
+```sql
+-- 1. Command side: does the order exist?
+SELECT id, status, created_at FROM "order".orders WHERE id = :id;
+-- 2. Outbox: was the event written, and has it been published?
+SELECT id, event_type, created_at, published_at FROM "order".outbox_events WHERE aggregate_id = :id::text;
+--    published_at IS NULL → relay problem: check outbox_relay_lag, relay logs, and Kafka health
+```
+```bash
+# 3. Kafka: did it reach the topic or the DLQ? (search by key = order id)
+kafka-console-consumer --bootstrap-server kafka:9092 --topic order-placed-dlq --from-beginning \
+  --property print.key=true --property print.headers=true | grep '^<id>'
+# 4. Consumer: is order-query lagging or stuck on a partition?
+kafka-consumer-groups --bootstrap-server kafka:9092 --describe --group order-query
+```
+```sql
+-- 5. Read model: is the row there, and with which version?
+SELECT order_id, status, version, updated_at FROM order_query.order_read_model WHERE order_id = :id;
+```
+6. Cache: if the row is correct but the API is wrong, it's a stale L1/L2 entry. Check the invalidation consumer lag
+   (`CacheInvalidationLagHigh`), and evict the key or wait out the TTL.
+7. Logs: grep the original request's `correlationId` across `app` and `order-query`. It is carried through the outbox
+   payload and the Kafka headers, so it links every hop.
+Typical answers: Kafka was down (backlog in the outbox, drains automatically), a poison event in the DLQ (fix, then replay with
+`/admin/dlq/replay`), consumer lag (scale up to the partition count, fix the slow handler), or stale cache.
+
+### 19.8 Scenario: Kafka consumer lag keeps growing
+1. `kafka-consumer-groups --describe`: is lag on **all** partitions (throughput problem) or **one** (a hot key, or a
+   poison record being retried. Check the logs for repeated failures at the same offset)?
+2. Frequent rebalances? Look for "Revoking / Assigned partitions" in the logs. Usually processing is exceeding `max.poll.interval.ms`
+   (500 records × slow DB writes), or pods are crash-looping or being autoscaled.
+3. Slow handler? Check DB latency for the projection's upsert and the consumer's thread dump.
+4. Mitigate: scale consumers up to the **partition count** (3 here, more pods won't help beyond that), reduce
+   `max.poll.records`, fix the slow query, or move the poison record to the DLQ.
+5. Long-term: more partitions (plan the key remapping), batch processing, and broker-side lag alerting.
+
+### 19.9 Scenario: one pod is bad, the others are fine
+Compare the bad pod with a good one: node (`-o wide`, node pressure, noisy neighbor), restarts, GC, its Redis or DB
+connectivity, its L1 cache contents (each pod has its own L1, so a missed invalidation produces exactly this
+"only sometimes wrong" behavior), and clock skew. Take it out of rotation by removing its label (19.1), capture diagnostics, then
+delete it. If the bad pods cluster on one node, cordon and drain that node.
+
+### 19.10 Scenario: CrashLoopBackOff / pods never become Ready
+- `kubectl logs <pod> --previous` and `describe pod`: an exception at startup (bad config, a missing secret, a Flyway
+  migration failure, a dependency not reachable), or a **probe misconfiguration** (liveness killing a slow-starting JVM.
+  That's why there is a `startupProbe` allowing 30 × 3 s), or OOMKilled during startup.
+- Readiness never passes: check `/actuator/health/readiness` on the pod via port-forward.
+- Remember that `minAvailable: 2` PDBs plus `maxUnavailable: 0` mean a broken rollout stalls rather than taking the service down.
+  That is the safety net working. Roll back.
+
+### 19.11 Scenario: intermittent errors that you can't reproduce
+Gather more signal before guessing: group the errors by pod, node, endpoint, client, payload size, and time of day (cron jobs,
+the hourly pruning job, backups). Look for timeouts at exact values (1 s Redis, 5 s Hikari, 10 s outbox publish, 30 s
+HAProxy), which point to the component that timed out. Add temporary targeted logging or raise the sampling rate.
+Check for retry storms (errors that cause retries that cause more errors). If it correlates with
+deploys or scaling, suspect connection resets during shutdown (preStop, graceful shutdown timing).
+
+### 19.12 Postmortem template (blameless)
+- **Summary**: what happened, in 2 sentences.
+- **Impact**: who and what was affected, for how long, how many failed requests or orders, SLO budget burned.
+- **Timeline** (UTC): first signal → detection → mitigation → resolution. Note the detection gap.
+- **Root cause**: the 5 Whys, technical and process (why did review, tests, and alerts not catch it?).
+- **What went well / what went poorly / where we got lucky**.
+- **Action items**: each with an owner and a due date. Prefer guardrails (alerts, tests, automation, limits) over "be more careful".
