@@ -294,3 +294,24 @@ d070575d-c271-49be-8a49-063ef993c496 (created 10:58:46 UTC). No repair command
 issued a PVC deletion or storage reset; actor/cause unverified. Kafka-1/2 and
 other existing PVC identities unchanged. Surviving quorum is healthy and partition
 checks pass, but these checks do not independently prove historical data loss zero.
+
+## Local lifecycle helper — 2026-10-27
+
+Owner requested project stop/start scripts. Added local-ci/scripts/local-stack.sh
+with start/stop/status and --dry-run. Docker label selection covers kind cluster
+hyperscale-k8s (including its external load balancer), Compose hyperscale-local-ci,
+and the exact dedicated BuildKit container. Stop order CI → builder → cluster;
+startup cluster → API readiness → nodes → registry → builder → CI. No destructive
+container/cluster/volume operations and no kubeconfig context mutation.
+
+`bash -n` passed. `python3 local-ci/scripts/test-local-stack.py` passed mocked
+native-/bin/bash order, dry-run, empty-stack and readiness-failure scenarios.
+Actual status/dry-run checks identify project containers without changing them.
+No full real shutdown/restart was executed, since the user requested a script.
+Usage and prerequisites documented in docs/operations/local-cicd.md.
+
+Lifecycle menu follow-up: `make local-stack` and no-argument script invocation
+open a numbered menu. Tested preview start/stop and status routing with fake
+Docker/kubectl, invalid input and EOF. Native Bash syntax and Make dry-run passed;
+actual Make menu opened and exited with option 0. Explicit CLI arguments retained.
+No real start/stop operation performed during menu verification.

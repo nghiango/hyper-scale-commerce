@@ -470,3 +470,41 @@ For ownership rollback, pause application/infrastructure auto-sync first. Transf
 resources back to the commerce owner deliberately with pruning disabled; do not
 cascade-delete either Argo Application or its workloads/PVCs. A Git revert alone
 is not an ownership migration procedure.
+
+### Stop and resume the whole local stack
+
+Run from the application repository:
+
+```bash
+make local-stack
+```
+
+Choose Start, Stop, Status, Preview start, Preview stop, or Exit from the numbered
+menu. The menu returns after each operation; choose 0 to exit. Running
+`bash local-ci/scripts/local-stack.sh` without arguments opens the same menu.
+Preview choices make no container changes. Existing argument-based commands remain
+available for automation:
+
+```bash
+bash local-ci/scripts/local-stack.sh status
+bash local-ci/scripts/local-stack.sh stop --dry-run
+bash local-ci/scripts/local-stack.sh stop
+# Later, with Docker Desktop running:
+bash local-ci/scripts/local-stack.sh start
+```
+
+Finish active Jenkins builds before stopping. The script targets only containers
+labelled for kind cluster hyperscale-k8s, Compose project hyperscale-local-ci, and
+the exact dedicated BuildKit container buildx_buildkit_hyperscale-local0. It stops
+CI first, then the builder and cluster; it starts the cluster and waits for API,
+node and registry readiness before starting the builder and CI. Existing stopped
+containers are resumed, not recreated. No cluster, container, volume or PVC deletion
+is performed. Other Docker projects are untouched. Startup failure leaves CI
+stopped rather than triggering builds against unavailable infrastructure.
+
+`start` requires an existing cluster, Docker Desktop, kubectl and the existing
+kind-hyperscale-k8s kubeconfig context. It does not provision a missing environment.
+It waits for infrastructure startup, not every application to finish recovery.
+Check `kubectl --context kind-hyperscale-k8s -n hyperscale get pods` afterward.
+Restart UI port-forwards separately. Monitoring emptyDir data remains disposable;
+stop/start is not a backup or a guarantee that every pod keeps its identity.

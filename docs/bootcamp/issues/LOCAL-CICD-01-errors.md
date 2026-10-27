@@ -202,3 +202,13 @@ Repair commands made no PVC deletion or reset. Cause/actor unresolved; no furthe
 storage mutation attempted. Kafka quorum recovered with zero follower lag and no
 unavailable/under-replicated partitions. Pending pgBackRest PVC keeps Argo health
 Progressing; backup readiness is outside this replica repair's demonstrated result.
+
+## 2026-10-27 — Lifecycle helper compatibility verification
+
+Native macOS Bash with nounset rejects expansion of an empty array, even when its
+length is zero. Replaced lifecycle helper empty-array copies/iteration with
+nounset-safe parameter expansion. Mocked tests run using /bin/bash and now pass
+for missing cluster/CI/builder, start/stop order, readiness failure and dry-run.
+Buildx inspect on this installed version does not support --format; used Docker's
+exact builder container name, verified from container inventory, rather than
+relying on a newer Buildx formatting flag. No real shutdown was performed.

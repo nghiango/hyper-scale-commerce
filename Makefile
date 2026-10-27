@@ -191,3 +191,7 @@ jvm-diagnostics-verify: ## Verify local JFR, thread, heap, and deadlock diagnost
 
 phase18-qualification: ## Run fail-closed Phase 18 Kubernetes/JVM qualification
 	bash performance/kubernetes/scripts/run-phase18-qualification.sh
+
+.PHONY: local-stack
+local-stack: ## Open interactive start/stop/status menu for the full local stack
+	bash local-ci/scripts/local-stack.sh
