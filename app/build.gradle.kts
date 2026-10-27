@@ -16,7 +16,7 @@ jooq {
         properties {
           property {
             key = "scripts"
-            value = "src/main/resources/db/migration"
+            value = "${project.projectDir}/src/main/resources/db/migration/*.sql"
           }
           property {
             key = "sort"
@@ -69,6 +69,8 @@ dependencies {
   implementation("io.micrometer:micrometer-registry-prometheus")
   implementation("io.micrometer:micrometer-tracing")
   implementation("io.micrometer:micrometer-tracing-bridge-brave")
+  implementation("io.zipkin.reporter2:zipkin-reporter-brave")
+  implementation("io.zipkin.reporter2:zipkin-sender-urlconnection")
   implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.9")
   implementation("io.micrometer:context-propagation")
   implementation("org.springframework.kafka:spring-kafka")

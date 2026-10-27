@@ -82,7 +82,7 @@ kafka:
   replicaCount: 3
   image:
     repository: confluentinc/cp-kafka
-    tag: 7.6.0
+    tag: 7.7.0
   storage:
     size: 5Gi
   resources:
@@ -168,3 +168,10 @@ security:
     enabled: true
   podSecurityStandards:
     enforce: "restricted"
+
+# Isolated owner-approved local delivery profile; baseline remains unchanged.
+localDelivery:
+  enabled: false
+  primaryPoolSize: 8
+  replicaPoolSize: 4
+  tracingEndpoint: http://otel-collector:9411/api/v2/spans

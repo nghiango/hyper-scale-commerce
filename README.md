@@ -111,3 +111,10 @@ Both services wait for healthy PostgreSQL and Kafka, then expose:
 Stop everything (including the services) with `make down`.
 
 See `docs/bootcamp/phase-00-plan.md` and `docs/bootcamp/phase-01-plan.md` for the approved implementation plans.
+
+## Local CI/CD
+
+The owner-approved Jenkins → local ARM64 registry → GitOps → Argo CD workflow,
+with Prometheus/Grafana and OpenTelemetry Collector/Tempo, is documented in
+[the local CI/CD runbook](docs/operations/local-cicd.md). Kafka remains the event
+broker. This local delivery exception does not advance BootCamp Phase 18.

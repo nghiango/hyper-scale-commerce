@@ -82,6 +82,16 @@ spec:
             - name: diagnostics
               mountPath: /diagnostics
           env:
+            {{- if .Values.localDelivery.enabled }}
+            - name: PRIMARY_DB_POOL_SIZE
+              value: {{ .Values.localDelivery.primaryPoolSize | quote }}
+            - name: REPLICA_DB_POOL_SIZE
+              value: {{ .Values.localDelivery.replicaPoolSize | quote }}
+            - name: APP_TRACING_ZIPKIN_ENDPOINT
+              value: {{ .Values.localDelivery.tracingEndpoint | quote }}
+            - name: MANAGEMENT_METRICS_DISTRIBUTION_PERCENTILESHISTOGRAM_HTTP_SERVER_REQUESTS
+              value: "true"
+            {{- end }}
             - name: SPRING_DATASOURCE_URL
               value: "jdbc:postgresql://postgres-ha-0.postgres-ha-headless.{{ .Values.global.namespace }}.svc.cluster.local:5432,postgres-ha-1.postgres-ha-headless.{{ .Values.global.namespace }}.svc.cluster.local:5432,postgres-ha-2.postgres-ha-headless.{{ .Values.global.namespace }}.svc.cluster.local:5432/hyperscale?targetServerType=primary"
             - name: SPRING_DATASOURCE_PRIMARY_URL

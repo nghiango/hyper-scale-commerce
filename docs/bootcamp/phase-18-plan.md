@@ -640,3 +640,53 @@ Verification discipline for every task:
 Only after every exit criterion is evidenced may Phase 18 be marked completed
 or replace Phase 17 as the latest verified architecture baseline. Cloud
 operations remain deferred to a later approved phase.
+
+## LOCAL-CICD-01 — Approved local delivery exception
+
+Approved by the project owner in chat on 2026-10-27. This is an isolated local
+CI/CD task, not Phase 18 completion or advancement. Argo CD, Jenkins, registry
+publishing and monitoring collectors are permitted only for this task. The existing application messaging contracts remain Kafka-owned.
+
+Acceptance: checked-in Jenkins pipeline runs the full Gradle build (including
+integration tests), publishes ARM64 app/query/Patroni images using commit tags,
+and commits a GitOps release containing chart sources from that same commit.
+Argo reconciles that repository with HPA replica drift ignored. Local bootstrap
+uses an explicit isolated context. Monitoring includes Prometheus, Grafana,
+OpenTelemetry Collector and Tempo, resource limits and metrics-server support.
+Credentials remain external. Include a runbook, rollback procedure,
+static verification and clearly identified live verification prerequisites.
+
+Expected files: Jenkinsfile, local-ci/, optional trace-export configuration in
+both deployables, build/test fixture portability fixes needed by the containerized
+agent, ADR-0028, operations/evidence documents. Verification: Helm
+lint/render, configuration invariants, GitOps update tests, Gradle build, then
+webhook-to-rollout/metrics/traces/HPA verification when credentials are supplied.
+
+Owner clarification (2026-10-27): retain dependency-independent readiness.
+PostgreSQL outage tests must inspect aggregate dependency health and preserve
+business outage/recovery assertions; production readiness configuration stays
+unchanged. The PostgreSQL/Kafka-only fixtures exclude Redis health locally.
+
+Owner trigger clarification (2026-10-27): use local Git polling instead of a
+public webhook/tunnel. Jenkins polls source Git every two minutes. Verify the
+push-to-poll-to-build-to-GitOps-to-rollout chain for this local variant. Keep the
+source job held until its CI definition is published to application main.
+
+## LOCAL-OPS-01 — Kafka UI and k9s (owner-approved 2026-10-27)
+
+Objective: provide a locally accessible Kafka dashboard and project-scoped k9s.
+The owner explicitly requested both tools. Use the existing three-node Kafka
+chart as the dashboard dependency; selectively sync Kafka infrastructure only
+through the held commerce Application. Do not deploy pending-ci application,
+PostgreSQL or Redis images or enable full commerce auto-sync. Add Kafbat UI to
+the existing platform chart with read-only cluster configuration and a ClusterIP
+Service, accessed by a localhost-only port-forward. Reuse installed k9s without
+an unrelated upgrade and provide an explicit context/namespace launcher.
+
+Acceptance: three real brokers are discoverable through the UI, dashboard HTTP
+responds, read-only setting is reported, ARM64 images are verified, k9s can show
+hyperscale resources, GitOps owns the UI configuration, and the commerce hold is
+unchanged. Verify Helm lint/render, selected-resource sync, broker quorum/API
+metadata, UI API, k9s TUI startup, final diff and secret exclusions. Document the
+local access commands, storage/resource cost and shutdown limits. Record this
+local operator-plane addition in ADR-0029; no phase advancement or HA claim.

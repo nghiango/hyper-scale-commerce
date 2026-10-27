@@ -205,3 +205,11 @@ implementing domain interfaces.
 - Phase 17 plan — Distributed Multi-Level Caching & Read-Replica Scaling
 - Phase 17 Evidence Dossier — Cache and Read-Replica Scaling
 - Phase 17 Review — Passed
+
+## Local delivery exception
+
+LOCAL-CICD-01 adds an opt-in local Jenkins/registry/GitOps/Argo CD delivery plane
+and Prometheus/Grafana/OpenTelemetry Collector/Tempo observability plane. Existing
+Brave propagation is preserved with optional asynchronous Zipkin export to the
+collector. Kafka remains the business event transport. See ADR-0028 and
+`docs/operations/local-cicd.md`; this exception does not qualify or advance Phase 18.

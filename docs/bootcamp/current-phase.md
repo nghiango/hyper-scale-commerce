@@ -73,3 +73,14 @@ Milestones:
 - P18-06: JVM Diagnostics, Profiling, and Operational Runbook (LOCAL FIXTURE VERIFIED; IN-POD/LOAD EVIDENCE PENDING)
 - P18-07: Kotlin/JVM Load, Spike, Failure, and Soak Qualification (NOT QUALIFIED)
 - P18-08: Phase 18 Evidence Dossier and Formal Phase Review (NOT COMPLETE)
+
+## Owner-approved local CI/CD exception (2026-10-27)
+
+LOCAL-CICD-01 in phase-18-plan.md permits isolated local Jenkins/Argo CD,
+local registry publishing, Prometheus/Grafana, OpenTelemetry Collector/Tempo.
+The GitOps prohibition above remains in effect outside
+this exception. This does not advance or qualify Phase 18. See ADR-0028.
+
+Owner-approved LOCAL-OPS-01 (2026-10-27) adds Kafbat Kafka UI and the existing
+native k9s client for local inspection. Selective startup of the already-approved
+Kafka resources is allowed; the application release and phase gates remain held.
