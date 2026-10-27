@@ -97,6 +97,149 @@ Rules for this interview:
 
 
 --------------------------------------------
+# Topic needs to care to be Java Sen
+Core Java — must be strong
+- OOP, SOLID, composition vs inheritance
+- equals() / hashCode(), Comparable / Comparator
+- Collections: HashMap, ConcurrentHashMap, ArrayList, HashSet
+- Generics and wildcards: ? extends, ? super
+- Exceptions: checked vs unchecked
+- Immutability, records, enums
+- Streams: intermediate/terminal, stateful/stateless, lazy evaluation
+- JVM: heap/stack/metaspace, JIT/AOT, class loading
+- Garbage collection and memory leaks
+
+Concurrency — important senior differentiator
+- Thread lifecycle and thread safety
+- synchronized, volatile, atomic classes
+- Race conditions and deadlocks
+- ExecutorService / thread pools
+- CompletableFuture
+- Locks and semaphores
+- Concurrent collections
+- Optimistic vs pessimistic locking
+- Virtual threads
+- CPU-bound vs I/O-bound workloads
+
+Spring / Spring Boot — go deep
+- IoC / DI and bean lifecycle
+- Component scanning
+- Spring Boot auto-configuration
+- @Configuration, @Bean, @Component, @Service, @Repository
+- Bean scopes
+- Spring proxies and AOP
+- @Transactional
+  - propagation
+  - isolation
+  - rollback
+  - self-invocation problem
+- Configuration/profiles
+- Spring MVC request lifecycle
+- Exception handling with @ControllerAdvice
+- Validation
+- Actuator
+- Spring Security fundamentals
+
+Database / JPA / Hibernate
+- JPA vs Hibernate
+- Entity lifecycle
+- Persistence context / dirty checking
+- Lazy vs eager loading
+- N+1 problem
+- Transactions
+- Optimistic/pessimistic locking
+- Indexes: B-tree, composite, covering
+- Query execution plans
+- Connection pools / HikariCP
+- Pagination
+- Batch operations
+- SQL joins
+- ACID and isolation levels
+- Views/materialized views
+
+REST API design
+- HTTP methods and status codes
+- Idempotency
+- Idempotency keys
+- PUT vs PATCH
+- Pagination/filtering/sorting
+- API versioning
+- Error response design
+- Authentication vs authorization
+- JWT/OAuth basics
+- Rate limiting
+- API backward compatibility
+
+Distributed systems / microservices — critical for senior
+- Sync vs async communication
+- Eventual consistency
+- CAP theorem
+- Retry + exponential backoff + jitter
+- Circuit breaker
+- Timeout
+- Bulkhead
+- Idempotent consumers
+- Distributed transactions
+- Saga
+- Transactional outbox
+- Duplicate/out-of-order messages
+- Distributed locking
+- Service discovery
+- API gateway
+- Observability
+- Graceful degradation
+
+Kafka / messaging
+- Producer → broker → partition → consumer
+- Consumer groups
+- Partitioning and ordering
+- Offsets
+- At-most-once / at-least-once / exactly-once
+- Idempotent producer/consumer
+- Retry topics and DLQ
+- Consumer lag
+- Rebalancing
+- Poison messages
+- Kafka transactions
+
+Caching
+- Local vs distributed cache
+- Caffeine / Redis
+- Cache-aside
+- Write-through / write-behind
+- TTL
+- Cache invalidation
+- Cache stampede
+- Cache penetration
+- Distributed cache consistency
+
+Testing
+- JUnit 5
+- Mockito
+- Unit vs integration vs E2E
+- Spring Boot tests
+- Testcontainers
+- Repository/API testing
+- Mock vs real dependency
+- Testing asynchronous flows
+- Contract testing
+
+Production / AWS / DevOps
+   Given your AWS experience, be ready to connect Java design decisions to AWS:
+- Docker
+- CI/CD
+- AWS Lambda
+- ECS/EKS basics
+- RDS
+- S3
+- SQS/SNS/EventBridge
+- CloudWatch
+- Secrets Manager
+- Horizontal scaling
+- Health/readiness checks
+- Zero-downtime deployment
+- Blue-green/canary deployments
+
 # Java Interview
 
 Act as a Principal Java Engineering Interviewer at a top tech company with 10+ years of experience. We are going to conduct a live, interactive mock interview for a Senior Java position. Here is the job description I am targeting:

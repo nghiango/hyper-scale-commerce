@@ -1,10 +1,8 @@
 plugins {
-  kotlin("jvm")
-  kotlin("plugin.spring")
+  java
   id("org.springframework.boot") version "4.0.0"
   id("io.spring.dependency-management") version "1.1.7"
   id("com.diffplug.spotless")
-  id("io.gitlab.arturbosch.detekt")
   id("org.jooq.jooq-codegen-gradle") version "3.19.28"
 }
 
@@ -44,8 +42,6 @@ sourceSets.main { java.srcDir("build/generated-sources/jooq") }
 
 tasks.named("compileJava") { dependsOn("jooqCodegen") }
 
-tasks.named("compileKotlin") { dependsOn("jooqCodegen") }
-
 val integrationTestSourceSet =
     sourceSets.create("integrationTest") {
       compileClasspath += sourceSets.main.get().output
@@ -76,7 +72,6 @@ dependencies {
   implementation("org.springframework.kafka:spring-kafka")
   implementation("net.logstash.logback:logstash-logback-encoder:8.0")
   implementation("org.flywaydb:flyway-database-postgresql")
-  implementation("org.jetbrains.kotlin:kotlin-reflect")
   implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
   implementation("org.springframework.boot:spring-boot-starter-data-redis")
   runtimeOnly("org.postgresql:postgresql")
@@ -85,11 +80,6 @@ dependencies {
 
   testImplementation("org.springframework.boot:spring-boot-starter-test")
   testImplementation("com.tngtech.archunit:archunit-junit5:1.3.0")
-  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.1")
-  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.1")
-
-  detekt("io.gitlab.arturbosch.detekt:detekt-cli:1.23.8")
-  detekt("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.0.21")
 
   "integrationTestImplementation"(project(":order-query"))
   "integrationTestImplementation"("org.springframework.boot:spring-boot-starter-test")
