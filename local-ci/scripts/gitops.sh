@@ -13,10 +13,15 @@ if [[ -z "$heads" ]]; then
 else
   git clone --single-branch --branch "$GITOPS_BRANCH" "$GITOPS_URL" "$work/repo"
 fi
-python3 local-ci/scripts/release.py "$work/repo" "$IMAGE_PREFIX" "$REVISION"
-helm lint "$work/repo/charts/commerce" -f "$work/repo/environments/local/values.yaml"
-helm lint "$work/repo/charts/platform"
-git -C "$work/repo" add charts environments/local/values.yaml
+scope=${RELEASE_SCOPE:-application}
+python3 local-ci/scripts/release.py "$work/repo" "$IMAGE_PREFIX" "$REVISION" --scope "$scope"
+for owned in application infrastructure; do
+  if [[ -d "$work/repo/charts/$owned" ]]; then
+    helm lint "$work/repo/charts/$owned" -f "$work/repo/environments/local/$owned-values.yaml"
+  fi
+done
+if [[ -d "$work/repo/charts/platform" ]]; then helm lint "$work/repo/charts/platform"; fi
+git -C "$work/repo" add charts environments
 if git -C "$work/repo" diff --cached --quiet; then exit 0; fi
-git -C "$work/repo" -c user.name='Jenkins local CI' -c user.email='jenkins@localhost' commit -m "Deploy $REVISION (linux/arm64)"
+git -C "$work/repo" -c user.name='Jenkins local CI' -c user.email='jenkins@localhost' commit -m "Deploy $scope $REVISION (linux/arm64)"
 git -C "$work/repo" push origin "HEAD:$GITOPS_BRANCH"

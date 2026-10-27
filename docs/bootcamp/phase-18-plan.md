@@ -716,3 +716,20 @@ Acceptance: Helm/release validation; native image/config checks; Argo sync;
 Loki/Alloy ready; least-privilege namespace RBAC; actual app/query logs retrievable
 through Loki and Grafana's data-source proxy; retained PVC across Loki restart;
 usage/runbook/evidence and ADR. Preserve existing credentials and unrelated work.
+
+## LOCAL-SPLIT-01 — Independent local delivery ownership (owner-approved 2026-10-27)
+
+Owner requested splitting business services from infrastructure after reviewing
+unnecessary Patroni image rollouts. Keep hyperscale-local for app/query only;
+add hyperscale-local-infrastructure for ingress, Kafka, etcd, PostgreSQL, Redis,
+backup and shared namespace/security. Keep hyperscale-local-platform independent.
+Partition generated charts from the existing baseline chart without duplicating
+resource ownership. Default Jenkins releases publish only application images,
+chart and values; infrastructure/platform/bootstrap require explicit scope.
+
+Acceptance: disjoint resource sets whose union matches the current monolithic
+render, no migration pod-template changes or PVC replacement, no pruning, Argo
+ownership/health checks, preservation of infrastructure/platform bytes across a
+normal application release, documentation and evidence. Do not alter existing
+unit/integration test policy or advance phases. Owner's current source branch is
+java; preserve it and report deployment-branch publication prerequisites.

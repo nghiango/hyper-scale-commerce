@@ -7,7 +7,7 @@ excluded at the owner's request.
 ## Topology and prerequisites
 
 GitHub push → local Git polling → Jenkins → Gradle build/unit/integration/architecture tests →
-Buildx ARM64 app/query/Patroni images → Kubernetes local registry → GitOps
+Buildx ARM64 app/query images (Patroni only for explicit infrastructure/bootstrap) → Kubernetes local registry → GitOps
 commit (charts plus image tags) → Argo CD → Kubernetes rolling deployment.
 
 Brave spans → OpenTelemetry Collector (Zipkin receiver) → OTLP → Tempo.
@@ -125,22 +125,19 @@ the configured branch, publication fails instead of branching implicitly.
 No GitOps releases should be written back to the application repository:
 that creates a webhook feedback loop and combines permissions unnecessarily.
 
-The first successful main-branch pipeline copies these paths into GitOps:
+The default application pipeline updates `charts/application` and
+`environments/local/application-values.yaml`. Explicit infrastructure scope updates
+`charts/infrastructure` and its values; platform scope updates `charts/platform`.
+Use explicit bootstrap scope for all three on a fresh environment. Publication
+commits only the selected scope. Concurrent external writes fail without forcing.
+Commit tags are traceable but the registry does not enforce tag immutability.
+Do not rerun historical builds as a deployment mechanism; use reviewed GitOps
+changes after checking migration compatibility.
 
-- `charts/commerce`: the existing application Helm chart from the tested commit.
-- `charts/platform`: local monitoring chart from the same commit.
-- `environments/local/values.yaml`: full SHA image tags and local profile.
-
-Both chart sources and values are updated in one GitOps commit. Concurrent
-external writes cause a non-fast-forward failure, never a forced overwrite.
-Do not rerun historical builds as a deployment mechanism; use a reviewed
-GitOps revert instead. Commit tags are traceable but the local registry does
-not enforce tag immutability; do not overwrite published commit tags.
-
-Argo read-only repository credentials and the two bootstrap Applications are
-now configured. Platform is Synced/Healthy; commerce remains manual-sync with
-`pending-ci` tags. For a fresh cluster, configure Argo repository credentials
-before applying Applications. The Application manifests already point to the supplied canonical GitOps URL.
+Three Argo Applications own independent application/infrastructure/platform scopes.
+For a fresh cluster, configure repository read credentials and publish charts and
+available images before registering them. Infrastructure must be ready before the
+application can connect to its dependencies.
 After the first release commit is published, apply:
 
 ```bash
@@ -426,3 +423,50 @@ review cleanup separately and retain both PVCs. Disabling logging in an existing
 installation also changes Grafana's configured volume back to emptyDir: keep the
 persistent volume mounted explicitly if disabling collection while retaining its
 state. Do not delete storage to fix startup/ingestion errors.
+
+### Independent application and infrastructure releases
+
+LOCAL-SPLIT-01 separates Argo ownership while retaining the same resources:
+
+| Argo Application | Chart | Owned resources |
+|---|---|---|
+| hyperscale-local | charts/application | app, order-query, their Services/PDBs/HPAs |
+| hyperscale-local-infrastructure | charts/infrastructure | Kafka, etcd, Patroni/PostgreSQL, Redis, ingress, backup, namespace/shared security |
+| hyperscale-local-platform | charts/platform | Metrics, traces, Grafana, Loki, Alloy and Kafka UI |
+
+`RELEASE_SCOPE` defaults to `application` in Jenkins. This publishes only app/query
+images, updates only charts/application and environments/local/application-values.yaml,
+and preserves infrastructure/platform Git trees byte-for-byte. Thus a business
+code release does not retag/restart Patroni or change monitoring configuration.
+`infrastructure` explicitly builds Patroni and updates only its chart and values;
+`platform` updates observability only; `bootstrap` initializes all three and is
+for deliberate environment provisioning, not normal business releases. All scopes
+still follow the existing pipeline's build/test policy; this task does not change
+whether integration tests are enabled by the owner.
+
+The generator partitions the baseline performance chart; that baseline remains
+usable as one chart. Application templates are app.yaml, order-query.yaml and
+hpa.yaml; all other baseline resources belong to infrastructure. Shared ServiceAccount,
+network policies and namespace remain infrastructure-owned, so deploy that scope
+before initializing application services. Separate Argo Applications do not provide
+cross-Application health ordering automatically.
+
+First setup with already-published ARM64 images:
+
+```bash
+python3 local-ci/scripts/release.py /path/to/gitops \
+  hyperscale-k8s-worker:30500/hyperscale FULL_COMMIT_SHA --scope bootstrap
+# Review, commit and push generated charts/values before registering Applications.
+kubectl --context kind-hyperscale-k8s apply -f local-ci/gitops/applications.yaml
+```
+
+The live split retains current image references and exact pod specs; old
+charts/commerce and environments/local/values.yaml are retained as an unwatched
+migration snapshot. They are no longer release targets. Source changes must reach
+Jenkins's configured deployment branch before the new scoped pipeline is active;
+an older pipeline continues updating those unwatched legacy paths instead.
+
+For ownership rollback, pause application/infrastructure auto-sync first. Transfer
+resources back to the commerce owner deliberately with pruning disabled; do not
+cascade-delete either Argo Application or its workloads/PVCs. A Git revert alone
+is not an ownership migration procedure.

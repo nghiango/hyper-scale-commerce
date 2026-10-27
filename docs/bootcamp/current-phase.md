@@ -88,3 +88,6 @@ Kafka resources is allowed; the application release and phase gates remain held.
 Owner-approved LOCAL-LOGS-01 (2026-10-27) extends the isolated local observability
 exception with Loki and Grafana Alloy for namespace-scoped pod log collection.
 See ADR-0030. No business architecture change or phase advancement is implied.
+
+Owner-approved LOCAL-SPLIT-01 (2026-10-27) separates local application,
+infrastructure and observability ownership/release scopes; see ADR-0031.
