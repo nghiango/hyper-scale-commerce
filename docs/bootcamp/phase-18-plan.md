@@ -701,3 +701,18 @@ retain quorum PDB minimum two. Preserve baseline performance settings and all PV
 Acceptance: Helm checks, GitOps reconciliation, broker/DCS quorum, database
 primary/replicas, application readiness and HPA/PDB verification. No HA claim for
 singleton ingress/Redis/monitoring; no phase advancement.
+
+## LOCAL-LOGS-01 — Local centralized logs (owner-approved 2026-10-27)
+
+Owner explicitly requested Loki after approving the explained Alloy → Loki →
+Grafana flow. Add pinned ARM64 Loki/Alloy to the platform GitOps chart. Use one
+Loki instance, filesystem TSDB on a 10Gi PVC, 24-hour retention, namespace-scoped
+API log collection without host mounts/privilege, and a provisioned Grafana Loki
+source. Existing application/runtime resources remain unchanged. Exclude the
+logging stack itself from collection to avoid a feedback loop. Do not claim
+production durability, exactly-once log delivery, or historical completeness.
+
+Acceptance: Helm/release validation; native image/config checks; Argo sync;
+Loki/Alloy ready; least-privilege namespace RBAC; actual app/query logs retrievable
+through Loki and Grafana's data-source proxy; retained PVC across Loki restart;
+usage/runbook/evidence and ADR. Preserve existing credentials and unrelated work.

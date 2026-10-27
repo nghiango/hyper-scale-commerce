@@ -370,3 +370,59 @@ both CPU and memory metrics. Ingress, Redis and monitoring stay singletons.
 Local app/query/ingress/Redis PDBs permit zero available pods for voluntary
 maintenance, so drains can interrupt service. Quorum PDBs retain minimum two.
 This development profile does not demonstrate production availability.
+
+### Central logs: Loki and Grafana Alloy
+
+Owner-approved LOCAL-LOGS-01 adds this local flow:
+
+```text
+hyperscale pod stdout/stderr → Alloy Kubernetes API reader → Loki → Grafana
+```
+
+Open Grafana at http://localhost:3000 (keep its port-forward running). Choose
+Explore, select **Loki**, select Last 15 minutes, enter one of these LogQL queries,
+and Run query:
+
+```logql
+{namespace="hyperscale", component="app"}
+{namespace="hyperscale", component="order-query"}
+{namespace="hyperscale", component="app"} |~ "(?i)error|exception"
+{namespace="hyperscale"} |= "your exact search text"
+```
+
+Use the pod/container labels to narrow results. Existing plain text log lines are
+preserved. No automatic log-to-trace links or JSON parsing is configured. Only
+hyperscale namespace pod logs are collected; external Docker Jenkins and node
+logs are excluded, as are Alloy/Loki themselves. Prior deleted/rotated logs cannot
+be reconstructed. Collector outages/restarts may cause gaps or duplicates.
+
+Loki is ClusterIP-only, single-replica, without authentication. Its API must not
+be exposed publicly. It uses 10Gi local PVC storage with asynchronous 24-hour
+retention and a compactor. This is not a disk-size cap: check capacity under heavy
+logging. No replication or backup is configured. Kind node/cluster deletion can
+lose stored logs. CPU/memory requests per logging pod are 50m/128Mi; limits are
+1 CPU, 768Mi for Loki and 256Mi for Alloy. Logs may contain sensitive business
+information; do not log credentials or payload secrets.
+
+Grafana's existing database is migrated to local-grafana-data (1Gi PVC) when
+adding the source, preserving configured accounts/dashboards. Recreate avoids
+concurrent SQLite writers. Its configured password may differ from the original
+startup Secret; do not reset it just to install a data source.
+
+Troubleshoot:
+
+```bash
+kubectl --context kind-hyperscale-k8s -n hyperscale get deploy loki alloy
+kubectl --context kind-hyperscale-k8s -n hyperscale get pvc loki-data local-grafana-data
+kubectl --context kind-hyperscale-k8s -n hyperscale logs deploy/alloy --tail=100
+kubectl --context kind-hyperscale-k8s -n hyperscale logs deploy/loki --tail=100
+# Optional direct local API access; use another terminal:
+kubectl --context kind-hyperscale-k8s -n hyperscale port-forward svc/loki 3100:3100
+curl -f http://localhost:3100/ready
+```
+
+Rollback by reverting the platform GitOps commit. Automatic pruning is disabled;
+review cleanup separately and retain both PVCs. Disabling logging in an existing
+installation also changes Grafana's configured volume back to emptyDir: keep the
+persistent volume mounted explicitly if disabling collection while retaining its
+state. Do not delete storage to fix startup/ingestion errors.
