@@ -59,7 +59,7 @@ does not execute builds. The pipeline disables concurrent builds and has a
 ```text
 hyperscale-app:<full-commit-SHA>
 hyperscale-order-query:<full-commit-SHA>
-hyperscale-patroni:<full-commit-SHA>
+hyperscale-patroni:<full-commit-SHA>  # explicit infrastructure/bootstrap scope only
 ```
 
 The registry runs in Kubernetes namespace `local-registry` and uses a 10Gi PVC.
@@ -82,10 +82,12 @@ contains the desired deployment:
 
 ```text
 charts/
-  commerce/                  Application and dependency resources
+  application/               App and order-query resources
+  infrastructure/            Stateful dependencies, ingress and shared security
   platform/                  Monitoring and Kafka UI
 environments/local/
-  values.yaml                Local image tags and overrides
+  application-values.yaml    Business service images and overrides
+  infrastructure-values.yaml Stateful service images and overrides
 ```
 
 [gitops.sh](../../local-ci/scripts/gitops.sh) clones GitOps and calls
@@ -98,7 +100,7 @@ Argo CD uses a separate read deploy key. The host SSH alias `personal.github.com
 is local configuration; Jenkins and Argo use the canonical `github.com` URL.
 Private keys belong in credentials/Secrets and must never be committed.
 
-**Future Jenkins releases replace the GitOps chart copies.** Durable changes
+**Future scoped Jenkins releases replace their selected GitOps chart copies.** Durable changes
 must also be made in the application repository's chart templates and release
 seed, rather than only editing the generated GitOps repository.
 
@@ -108,10 +110,11 @@ seed, rather than only editing the generated GitOps repository.
 
 | Argo Application | Resources |
 |---|---|
-| `hyperscale-local` | App, order-query, Kafka, PostgreSQL, etcd, Redis, ingress and backups |
-| `hyperscale-local-platform` | Prometheus, Grafana, Collector, Tempo and Kafka UI |
+| `hyperscale-local` | App, order-query and their Services/PDBs/HPAs |
+| `hyperscale-local-infrastructure` | Kafka, PostgreSQL, etcd, Redis, ingress, backups and shared security |
+| `hyperscale-local-platform` | Prometheus, Grafana, Collector, Tempo, Kafka UI, Loki and Alloy |
 
-Both watch GitOps `main` and deploy into namespace `hyperscale`, on the local
+All three watch GitOps `main` and deploy into namespace `hyperscale`, on the local
 `kind-hyperscale-k8s` cluster. Argo renders Helm charts with the configured values
 and applies the resulting Kubernetes resources.
 
@@ -278,3 +281,13 @@ Git history.
 Image rollback does not undo database schema migrations or data changes. Verify
 schema compatibility, image availability in the registry and any required data
 recovery procedure separately.
+
+## Independent release scopes (LOCAL-SPLIT-01)
+
+The current ownership is hyperscale-local (app/query),
+hyperscale-local-infrastructure (stateful dependencies, ingress and shared security),
+and hyperscale-local-platform (observability). Normal Jenkins RELEASE_SCOPE is
+application: only app/query images and application chart/values change. Explicit
+infrastructure, platform and bootstrap scopes handle their independent lifecycle.
+Legacy charts/commerce and environments/local/values.yaml are unwatched migration
+snapshots. See the runbook's independent release section for ordering and rollback.

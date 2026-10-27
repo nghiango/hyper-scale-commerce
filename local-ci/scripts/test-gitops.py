@@ -26,6 +26,7 @@ with tempfile.TemporaryDirectory(prefix='hyperscale-gitops-test-') as temp:
         'GITOPS_BRANCH': 'main',
         'IMAGE_PREFIX': 'hyperscale-k8s-worker:30500/hyperscale',
         'REVISION': '0123456789012345678901234567890123456789',
+        'RELEASE_SCOPE': 'bootstrap',
         'SSH_AUTH_SOCK': str(Path(temp) / 'unused-socket'),
         # Git rewrites the validated SSH URL to this disposable local repository.
         'GIT_CONFIG_COUNT': '1',
@@ -35,15 +36,22 @@ with tempfile.TemporaryDirectory(prefix='hyperscale-gitops-test-') as temp:
     run('bash', 'local-ci/scripts/gitops.sh', env=env)
     first = run('git', '--git-dir', str(remote), 'rev-parse', 'refs/heads/main')
     values = run('git', '--git-dir', str(remote), 'show',
-                 'main:environments/local/values.yaml')
+                 'main:environments/local/application-values.yaml')
     assert f'tag: "{env["REVISION"]}"' in values
-    run('git', '--git-dir', str(remote), 'show', 'main:charts/commerce/Chart.yaml')
+    run('git', '--git-dir', str(remote), 'show', 'main:charts/application/Chart.yaml')
     run('git', '--git-dir', str(remote), 'show', 'main:charts/platform/Chart.yaml')
     run('bash', 'local-ci/scripts/gitops.sh', env=env)
     assert run('git', '--git-dir', str(remote), 'rev-parse', 'main') == first
+    infrastructure = run('git', '--git-dir', str(remote), 'rev-parse', 'main:charts/infrastructure')
+    platform = run('git', '--git-dir', str(remote), 'rev-parse', 'main:charts/platform')
+    infra_values = run('git', '--git-dir', str(remote), 'show', 'main:environments/local/infrastructure-values.yaml')
+    env['RELEASE_SCOPE'] = 'application'
     env['REVISION'] = 'abcdef0123456789abcdef0123456789abcdef01'
     run('bash', 'local-ci/scripts/gitops.sh', env=env)
     assert run('git', '--git-dir', str(remote), 'rev-list', '--count', 'main') == '2'
     assert env['REVISION'] in run('git', '--git-dir', str(remote), 'show',
-                                 'main:environments/local/values.yaml')
+                                 'main:environments/local/application-values.yaml')
+    assert infrastructure == run('git', '--git-dir', str(remote), 'rev-parse', 'main:charts/infrastructure')
+    assert platform == run('git', '--git-dir', str(remote), 'rev-parse', 'main:charts/platform')
+    assert infra_values == run('git', '--git-dir', str(remote), 'show', 'main:environments/local/infrastructure-values.yaml')
 print('Local GitOps empty-repo initialization, idempotence and release update passed.')

@@ -3,6 +3,9 @@ set -euo pipefail
 : "${REGISTRY:?}" "${IMAGE_PREFIX:?}" "${REVISION:?}"
 [[ "$REVISION" =~ ^[0-9a-f]{40}$ ]]
 [[ "$IMAGE_PREFIX" == "$REGISTRY/"* ]]
+scope=${RELEASE_SCOPE:-application}
+case "$scope" in application|infrastructure|platform|bootstrap) ;; *) echo "Invalid RELEASE_SCOPE" >&2; exit 1 ;; esac
+if [[ "$scope" == platform ]]; then exit 0; fi
 if ! docker buildx inspect hyperscale-local >/dev/null 2>&1; then
   docker buildx create --name hyperscale-local --node hyperscale-local0 \
     --driver docker-container --driver-opt network=kind \
@@ -13,9 +16,13 @@ output_flag=(--load)
 if [[ "${PUSH_IMAGES:-false}" == "true" ]]; then
   output_flag=(--push)
 fi
+if [[ "$scope" == application || "$scope" == bootstrap ]]; then
 for module in app order-query; do
   docker buildx build --builder hyperscale-local --platform linux/arm64 "${output_flag[@]}" \
     --tag "$IMAGE_PREFIX/hyperscale-$module:$REVISION" "$module"
 done
+fi
+if [[ "$scope" == infrastructure || "$scope" == bootstrap ]]; then
 docker buildx build --builder hyperscale-local --platform linux/arm64 "${output_flag[@]}" \
   --tag "$IMAGE_PREFIX/hyperscale-patroni:$REVISION" performance/patroni
+fi

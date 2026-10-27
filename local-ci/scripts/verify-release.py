@@ -43,3 +43,13 @@ assert 'uid: loki' in platform
 assert 'names = ["hyperscale"]' in platform
 assert 'url = "http://loki:3100/loki/api/v1/push"' in platform
 print('Namespace-scoped logging, persistent storage and Grafana source invariants passed.')
+
+application = (root / 'application.yaml').read_text()
+infrastructure = (root / 'infrastructure.yaml').read_text()
+assert 'kind: StatefulSet' not in application
+assert 'kind: Namespace' not in application
+assert 'kind: Deployment' not in infrastructure
+assert 'kind: HorizontalPodAutoscaler' not in infrastructure
+assert 'hyperscale-patroni:' not in application
+assert len(re.findall(r'^kind: Deployment$', application, re.M)) == 2
+print('Application/infrastructure ownership boundaries passed.')

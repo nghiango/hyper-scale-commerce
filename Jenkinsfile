@@ -7,6 +7,7 @@ pipeline {
     buildDiscarder(logRotator(numToKeepStr: '15'))
   }
   parameters {
+    choice(name: 'RELEASE_SCOPE', choices: ['application', 'infrastructure', 'platform', 'bootstrap'], description: 'Application is the normal release; other scopes explicitly update infrastructure/monitoring')
     string(name: 'DEPLOY_BRANCH', defaultValue: 'main', description: 'Only this application branch may publish')
     string(name: 'REGISTRY', defaultValue: 'hyperscale-k8s-worker:30500', description: 'Registry host, without scheme')
     string(name: 'IMAGE_PREFIX', defaultValue: 'hyperscale-k8s-worker:30500/hyperscale', description: 'Registry host/owner')
