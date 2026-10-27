@@ -1,0 +1,33 @@
+#!/usr/bin/env python3
+"""Validate critical release invariants without third-party Python packages."""
+import re
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+commerce = (root / 'commerce.yaml').read_text()
+platform = (root / 'platform.yaml').read_text()
+sha = '0123456789012345678901234567890123456789'
+for image in ['app', 'order-query', 'patroni']:
+    assert f'hyperscale-{image}:{sha}' in commerce, image
+assert commerce.count('name: APP_TRACING_ZIPKIN_ENDPOINT') == 2
+assert commerce.count('name: PRIMARY_DB_POOL_SIZE') == 2
+assert commerce.count('maxUnavailable: 0') == 2
+assert commerce.count('kind: HorizontalPodAutoscaler') == 2
+assert 'kind: NetworkPolicy' in platform
+assert 'ApplicationTargetsMissing' in platform
+assert 'receivers: [zipkin, otlp]' in platform
+assert 'exporters: [otlp/tempo]' in platform
+assert 'rabbitmq' not in platform.lower()
+# Derive the pool budget from rendered HPAs and deployment environment values.
+ceilings = [int(n) for n in re.findall(r"maxReplicas: (\d+)", commerce)]
+primary = [int(n) for n in re.findall(
+    r'name: PRIMARY_DB_POOL_SIZE\s+value: "(\d+)"', commerce)]
+replica = [int(n) for n in re.findall(
+    r'name: REPLICA_DB_POOL_SIZE\s+value: "(\d+)"', commerce)]
+assert len(ceilings) == len(primary) == len(replica) == 2
+budget = sum((ceiling + 1) * (p + r)
+             for ceiling, p, r in zip(ceilings, primary, replica))
+assert budget <= 240, f"Database pool budget too large: {budget}"
+assert not re.search(r'IMAGE_PREFIX|COMMIT_SHA', commerce)
+print('Release image, rollout, HPA, pool-budget and monitoring invariants passed.')
