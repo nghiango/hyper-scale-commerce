@@ -690,3 +690,14 @@ unchanged. Verify Helm lint/render, selected-resource sync, broker quorum/API
 metadata, UI API, k9s TUI startup, final diff and secret exclusions. Document the
 local access commands, storage/resource cost and shutdown limits. Record this
 local operator-plane addition in ADR-0029; no phase advancement or HA claim.
+
+### LOCAL-CICD-01 replica repair (owner-approved 2026-10-27)
+
+Restore Kafka/etcd/PostgreSQL to three replicas using existing storage. Local
+app/query start at one, CPU HPA 1–3; omit memory metric locally because idle JVM
+resident memory exceeded its utilization target. Local ingress/Redis stay at one.
+Allow voluntary disruption of local stateless/Redis singletons (PDB minimum zero),
+retain quorum PDB minimum two. Preserve baseline performance settings and all PVCs.
+Acceptance: Helm checks, GitOps reconciliation, broker/DCS quorum, database
+primary/replicas, application readiness and HPA/PDB verification. No HA claim for
+singleton ingress/Redis/monitoring; no phase advancement.
