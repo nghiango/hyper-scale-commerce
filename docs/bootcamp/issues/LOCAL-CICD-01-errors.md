@@ -186,3 +186,19 @@ with the cleaned stored credential returned HTTP 200 Logged in, and the issued
 session authenticated GET /api/user as admin (HTTP 200). Login protection remains
 enabled. No pod restart or database/dashboard deletion was needed. The bootstrap
 password generator now strips its trailing newline for future installations.
+
+## 2026-10-27 — Replica repair verification
+
+Initial state: Kafka 0/1 ready, configured voters [1] conflict with persisted
+[1,2,3]; etcd membership query timed out after scale-down. Owner approved restoring
+three-member quorums and the local lightweight profile. No storage reset used.
+A Patroni verification command initially referenced nonexistent /tmp/patroni.yml;
+corrected to /var/lib/postgresql/patroni.yml from the entrypoint. Corrected command
+confirmed Leader, Sync Standby and Replica, both standbys streaming at zero lag.
+
+Storage verification found Kafka-0 PVC replaced during reconciliation (UID
+542d7693-9eee-4386-85e1-e5242480f6fd → d070575d-c271-49be-8a49-063ef993c496).
+Repair commands made no PVC deletion or reset. Cause/actor unresolved; no further
+storage mutation attempted. Kafka quorum recovered with zero follower lag and no
+unavailable/under-replicated partitions. Pending pgBackRest PVC keeps Argo health
+Progressing; backup readiness is outside this replica repair's demonstrated result.

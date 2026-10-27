@@ -269,3 +269,28 @@ failed-login lockout, which was allowed to expire without disabling protection.
 POST /login then returned HTTP 200 Logged in; the resulting browser session
 accessed /api/user as the Grafana admin with HTTP 200. Private passwords and
 session cookies were not printed. No pod restart or data removal was performed.
+
+## Replica repair — 2026-10-27
+
+Owner authorized recovery of accidental single-replica quorum configuration.
+GitOps commit `2f7c54b` restores Kafka/etcd/PostgreSQL to three and sets local
+CPU-only app/query HPA 1–3; local singleton PDB minimum zero. Existing deployed
+image tags retained. Source templates and release seed updated for future builds.
+Helm lint/render and `bash local-ci/scripts/validate.sh` passed. Live recovery
+verification is recorded below after reconciliation.
+
+Live verification: Kafka/etcd/PostgreSQL each 3/3 ready. Kafka voters [1,2,3],
+leader 3, high watermark 22488, maximum follower lag 0. Kafka CLI reported no
+under-replicated or unavailable partitions. All three etcd endpoints successfully
+committed health proposals. Patroni: primary plus synchronous standby and replica,
+both streaming at zero lag. App 1/1, query 2/2 during HPA stabilization; both HPAs
+CPU-only, min 1/max 3. Singleton local PDBs minimum 0; quorum PDBs minimum 2.
+Argo Synced to 2f7c54b6fe80383c38573832266a87115b70b8b1, health Progressing
+because pgbackrest-repo-pvc is pending. No backup readiness claim is made.
+
+Storage anomaly: before/after PVC inventory detected kafka-data-kafka-0 UID
+changed from 542d7693-9eee-4386-85e1-e5242480f6fd to
+d070575d-c271-49be-8a49-063ef993c496 (created 10:58:46 UTC). No repair command
+issued a PVC deletion or storage reset; actor/cause unverified. Kafka-1/2 and
+other existing PVC identities unchanged. Surviving quorum is healthy and partition
+checks pass, but these checks do not independently prove historical data loss zero.

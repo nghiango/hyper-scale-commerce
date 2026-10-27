@@ -355,3 +355,18 @@ The same three PVCs were retained. The UI can still display `3.6-IV2`: the
 retained metadata feature level was verified with `kafka-features describe`,
 while the running broker CLI reports `7.7.0-ccs` and all pod images are 7.7.0.
 No metadata feature upgrade was forced solely to change the UI display.
+
+### Lightweight local replica profile
+
+Local delivery retains three Kafka brokers, three etcd members and three Patroni
+instances. Existing quorum membership and Kafka RF=3/min ISR=2 require these
+members; retain their PVCs when recovering from accidental scale-down. PostgreSQL
+read pools also require available standby instances.
+
+App/query start at one and scale from one to three on CPU. The local profile
+omits memory-based HPA because idle JVM resident memory kept triggering expansion;
+resource requests and limits remain unchanged. Baseline performance HPAs retain
+both CPU and memory metrics. Ingress, Redis and monitoring stay singletons.
+Local app/query/ingress/Redis PDBs permit zero available pods for voluntary
+maintenance, so drains can interrupt service. Quorum PDBs retain minimum two.
+This development profile does not demonstrate production availability.

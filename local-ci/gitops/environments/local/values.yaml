@@ -5,21 +5,36 @@ global:
   imagePullPolicy: Always
 app:
   replicaCount: 1
+  hpa:
+    minReplicas: 1
+    maxReplicas: 3
+    memoryMetricEnabled: false
   image:
     repository: IMAGE_PREFIX/hyperscale-app
     tag: "COMMIT_SHA"
 orderQuery:
   replicaCount: 1
+  hpa:
+    minReplicas: 1
+    maxReplicas: 3
+    memoryMetricEnabled: false
   image:
     repository: IMAGE_PREFIX/hyperscale-order-query
     tag: "COMMIT_SHA"
+kafka:
+  replicaCount: 3
+etcd:
+  replicaCount: 3
+ingress:
+  replicaCount: 1
 postgresHa:
+  replicaCount: 3
   image:
     repository: IMAGE_PREFIX/hyperscale-patroni
     tag: "COMMIT_SHA"
 localDelivery:
   enabled: true
-  # 2 services * (8 max + 1 surge) * (8 primary + 4 replica) = 216 connections.
+  # 2 services * (3 max + 1 surge) * (8 primary + 4 replica) = 96 connections.
   # Reserve additional headroom for migrations, Patroni and operator sessions.
   primaryPoolSize: 8
   replicaPoolSize: 4
