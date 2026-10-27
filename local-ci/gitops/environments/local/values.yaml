@@ -4,12 +4,12 @@ global:
   revision: "COMMIT_SHA"
   imagePullPolicy: Always
 app:
-  replicaCount: 3
+  replicaCount: 1
   image:
     repository: IMAGE_PREFIX/hyperscale-app
     tag: "COMMIT_SHA"
 orderQuery:
-  replicaCount: 3
+  replicaCount: 1
   image:
     repository: IMAGE_PREFIX/hyperscale-order-query
     tag: "COMMIT_SHA"
