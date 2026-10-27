@@ -40,3 +40,10 @@ logs/
 # Environment / secrets
 .env
 .env.local
+
+# Local CI credentials and rendered private repository configuration
+local-ci/.env.*
+local-ci/*.rendered.yaml
+
+# Dedicated CI/CD SSH credentials (including public key copies)
+local-ci/secrets/

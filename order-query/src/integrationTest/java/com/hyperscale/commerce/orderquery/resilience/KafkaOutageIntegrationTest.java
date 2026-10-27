@@ -66,7 +66,7 @@ class KafkaOutageIntegrationTest {
       ResilienceHarness.awaitHealthContains(port, "\"kafka\":{\"status\":\"UP\"}");
 
       long orderId = 1L;
-      String producerBootstrap = "localhost:" + KAFKA_HOST_PORT;
+      String producerBootstrap = kafka.getBootstrapServers();
       produceOrderPlaced(orderId, producerBootstrap);
 
       JdbcTemplate jdbcTemplate = context.getBean(JdbcTemplate.class);
@@ -78,7 +78,7 @@ class KafkaOutageIntegrationTest {
   }
 
   private ConfigurableApplicationContext startOrderQuery() {
-    String kafkaBootstrap = "PLAINTEXT://localhost:" + KAFKA_HOST_PORT;
+    String kafkaBootstrap = "PLAINTEXT://" + kafka.getHost() + ":" + KAFKA_HOST_PORT;
     return new SpringApplicationBuilder(OrderQueryApplication.class)
         .run(
             "--spring.config.name=orderquery",

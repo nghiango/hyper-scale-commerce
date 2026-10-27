@@ -1,7 +1,6 @@
 package com.hyperscale.commerce.config.observability;
 
 import brave.Tracing;
-import brave.handler.SpanHandler;
 import com.hyperscale.commerce.config.AppProperties;
 import io.micrometer.observation.ObservationRegistry;
 import io.micrometer.observation.transport.ReceiverContext;
@@ -16,20 +15,42 @@ import io.micrometer.tracing.brave.bridge.BraveTracer;
 import io.micrometer.tracing.handler.DefaultTracingObservationHandler;
 import io.micrometer.tracing.handler.PropagatingReceiverTracingObservationHandler;
 import io.micrometer.tracing.handler.PropagatingSenderTracingObservationHandler;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import zipkin2.reporter.brave.AsyncZipkinSpanHandler;
+import zipkin2.reporter.urlconnection.URLConnectionSender;
 
 @Configuration
+@EnableConfigurationProperties(ZipkinExportProperties.class)
 public class TracingConfiguration {
 
   @Bean
   @ConditionalOnMissingBean(Tracing.class)
-  public Tracing braveTracing(AppProperties appProperties) {
-    return Tracing.newBuilder()
-        .localServiceName(appProperties.name())
-        .addSpanHandler(SpanHandler.NOOP)
+  public Tracing braveTracing(
+      AppProperties appProperties, ObjectProvider<AsyncZipkinSpanHandler> exporter) {
+    Tracing.Builder builder = Tracing.newBuilder().localServiceName(appProperties.name());
+    exporter.ifAvailable(builder::addSpanHandler);
+    return builder.build();
+  }
+
+  @Bean(destroyMethod = "close")
+  @ConditionalOnProperty(name = "app.tracing.zipkin.endpoint")
+  public URLConnectionSender zipkinSender(ZipkinExportProperties properties) {
+    return URLConnectionSender.newBuilder()
+        .endpoint(properties.endpoint().toString())
+        .connectTimeout(1000)
+        .readTimeout(1000)
         .build();
+  }
+
+  @Bean(destroyMethod = "close")
+  @ConditionalOnProperty(name = "app.tracing.zipkin.endpoint")
+  public AsyncZipkinSpanHandler zipkinSpanHandler(URLConnectionSender sender) {
+    return AsyncZipkinSpanHandler.create(sender);
   }
 
   @Bean

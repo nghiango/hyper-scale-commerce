@@ -2,15 +2,15 @@ package com.hyperscale.commerce.orderquery.resilience;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.Bind;
+import com.github.dockerjava.api.model.Volume;
 import com.hyperscale.commerce.orderquery.OrderQueryApplication;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
@@ -19,11 +19,12 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
-import org.testcontainers.containers.BindMode;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -43,17 +44,19 @@ class PostgresOutageIntegrationTest {
   private static final int POSTGRES_HOST_PORT = 5435;
   private static final int POSTGRES_CONTAINER_PORT = 5432;
 
-  private static final Path postgresDataDir = createPostgresDataDir();
+  private static final String postgresVolume = "hyperscale-outage-" + java.util.UUID.randomUUID();
 
   @Container static final KafkaContainer kafka = createKafka();
 
   @Container static final PostgreSQLContainer<?> postgres = createPostgres();
 
-  private static Path createPostgresDataDir() {
+  @AfterAll
+  static void removePostgresVolume() {
+    postgres.stop();
     try {
-      return Files.createTempDirectory("p6-04-order-query-postgres-");
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
+      DockerClientFactory.instance().client().removeVolumeCmd(postgresVolume).exec();
+    } catch (NotFoundException ignored) {
+      // Startup may fail before Docker creates the volume.
     }
   }
 
@@ -67,8 +70,11 @@ class PostgresOutageIntegrationTest {
   private static PostgreSQLContainer<?> createPostgres() {
     PostgreSQLContainer<?> container = new PostgreSQLContainer<>("postgres:16");
     container.setPortBindings(List.of(POSTGRES_HOST_PORT + ":" + POSTGRES_CONTAINER_PORT));
-    container.withFileSystemBind(
-        postgresDataDir.toString(), "/var/lib/postgresql/data", BindMode.READ_WRITE);
+    container.withCreateContainerCmdModifier(
+        command ->
+            command
+                .getHostConfig()
+                .withBinds(new Bind(postgresVolume, new Volume("/var/lib/postgresql/data"))));
     container.waitingFor(
         Wait.forLogMessage(".*database system is ready to accept connections.*", 2));
     return container;
@@ -84,7 +90,7 @@ class PostgresOutageIntegrationTest {
 
     try {
       ResilienceHarness.awaitReadiness(port);
-      String producerBootstrap = "localhost:" + KAFKA_HOST_PORT;
+      String producerBootstrap = kafka.getBootstrapServers();
 
       long order1 = 1L;
       produceOrderPlaced(order1, producerBootstrap);
@@ -92,7 +98,8 @@ class PostgresOutageIntegrationTest {
       assertThat(get(port, "/orders/" + order1).statusCode()).isEqualTo(200);
 
       ResilienceHarness.stopPostgres(postgres);
-      ResilienceHarness.awaitHealthContains(port, "\"DOWN\"", "/actuator/health/readiness");
+      awaitAggregateHealth(port, "DOWN");
+      ResilienceHarness.awaitReadiness(port);
       long uncachedOrder = 99999L;
       assertThat(get(port, "/orders/" + uncachedOrder).statusCode()).isGreaterThanOrEqualTo(500);
 
@@ -100,7 +107,7 @@ class PostgresOutageIntegrationTest {
       produceOrderPlaced(order2, producerBootstrap);
 
       ResilienceHarness.startPostgres(postgres);
-      ResilienceHarness.awaitHealthContains(port, "\"UP\"", "/actuator/health/readiness");
+      awaitAggregateHealth(port, "UP");
       awaitOrder(port, order1);
       assertThat(get(port, "/orders/" + order1).statusCode()).isEqualTo(200);
       awaitOrder(port, order2);
@@ -119,9 +126,10 @@ class PostgresOutageIntegrationTest {
             "--spring.datasource.url=" + postgres.getJdbcUrl(),
             "--spring.datasource.username=" + postgres.getUsername(),
             "--spring.datasource.password=" + postgres.getPassword(),
-            "--spring.kafka.bootstrap-servers=PLAINTEXT://localhost:" + KAFKA_HOST_PORT,
+            "--spring.kafka.bootstrap-servers=" + kafka.getBootstrapServers(),
             "--spring.flyway.locations=classpath:db/migration-order-query",
             "--spring.flyway.schemas=order_query",
+            "--management.health.redis.enabled=false",
             "--server.port=0");
   }
 
@@ -155,6 +163,24 @@ class PostgresOutageIntegrationTest {
     }
     throw new AssertionError(
         "Order " + orderId + " not projected within " + TIMEOUT_SECONDS + " seconds");
+  }
+
+  private void awaitAggregateHealth(int port, String expected) throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
+    String lastBody = "";
+    while (System.nanoTime() < deadline) {
+      HttpResponse<String> response = get(port, "/actuator/health");
+      lastBody = response.body();
+      var health = new com.fasterxml.jackson.databind.ObjectMapper().readTree(lastBody);
+      if (expected.equals(health.path("status").asText())
+          && expected.equals(health.path("components").path("db").path("status").asText())
+          && response.statusCode() == ("UP".equals(expected) ? 200 : 503)) {
+        return;
+      }
+      Thread.sleep(POLL_MILLIS);
+    }
+    throw new AssertionError(
+        "Aggregate/database health did not become " + expected + ": " + lastBody);
   }
 
   private HttpResponse<String> get(int port, String path) throws IOException, InterruptedException {

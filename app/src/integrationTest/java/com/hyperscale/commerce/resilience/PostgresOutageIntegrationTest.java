@@ -3,24 +3,26 @@ package com.hyperscale.commerce.resilience;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.Bind;
+import com.github.dockerjava.api.model.Volume;
 import com.hyperscale.commerce.Application;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.containers.BindMode;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -44,7 +46,7 @@ public class PostgresOutageIntegrationTest {
       Pattern.compile(
           "events_published_total\\{[^}]*topic=\"order-placed\"[^}]*\\}\\s+(\\d+\\.?\\d*)");
 
-  private static final Path postgresDataDir = createPostgresDataDir();
+  private static final String postgresVolume = "hyperscale-outage-" + java.util.UUID.randomUUID();
 
   @Container static final KafkaContainer kafka = kafkaContainer();
 
@@ -53,11 +55,13 @@ public class PostgresOutageIntegrationTest {
   private final HttpClient httpClient = HttpClient.newHttpClient();
   private final ObjectMapper objectMapper = new ObjectMapper();
 
-  private static Path createPostgresDataDir() {
+  @AfterAll
+  static void removePostgresVolume() {
+    postgres.stop();
     try {
-      return Files.createTempDirectory("p6-04-app-postgres-");
-    } catch (IOException e) {
-      throw new IllegalStateException(e);
+      DockerClientFactory.instance().client().removeVolumeCmd(postgresVolume).exec();
+    } catch (NotFoundException ignored) {
+      // Startup may fail before Docker creates the volume.
     }
   }
 
@@ -72,8 +76,11 @@ public class PostgresOutageIntegrationTest {
     PostgreSQLContainer<?> container =
         new PostgreSQLContainer<>(DockerImageName.parse("postgres:16"));
     container.setPortBindings(List.of(POSTGRES_HOST_PORT + ":" + POSTGRES_CONTAINER_PORT));
-    container.withFileSystemBind(
-        postgresDataDir.toString(), "/var/lib/postgresql/data", BindMode.READ_WRITE);
+    container.withCreateContainerCmdModifier(
+        command ->
+            command
+                .getHostConfig()
+                .withBinds(new Bind(postgresVolume, new Volume("/var/lib/postgresql/data"))));
     container.waitingFor(
         Wait.forLogMessage(".*database system is ready to accept connections.*", 2));
     return container;
@@ -88,6 +95,7 @@ public class PostgresOutageIntegrationTest {
 
     try {
       ResilienceHarness.awaitReadiness(monolithPort);
+      awaitAggregateHealth(monolithPort, "UP");
 
       long order1 = postOrder(monolithPort);
       awaitEventsPublished(monolithPort, 1.0);
@@ -95,7 +103,8 @@ public class PostgresOutageIntegrationTest {
       awaitOutboxPublished(jdbcTemplate, order1);
 
       ResilienceHarness.stopPostgres(postgres);
-      ResilienceHarness.awaitHealthContains(monolithPort, "\"DOWN\"", "/actuator/health/readiness");
+      awaitAggregateHealth(monolithPort, "DOWN");
+      ResilienceHarness.awaitReadiness(monolithPort);
 
       HttpResponse<String> failingResponse =
           post(
@@ -105,7 +114,7 @@ public class PostgresOutageIntegrationTest {
       assertThat(failingResponse.statusCode()).isGreaterThanOrEqualTo(500);
 
       ResilienceHarness.startPostgres(postgres);
-      ResilienceHarness.awaitHealthContains(monolithPort, "\"UP\"", "/actuator/health/readiness");
+      awaitAggregateHealth(monolithPort, "UP");
 
       awaitOutboxPublished(jdbcTemplate, order1);
       assertThat(eventsPublished(monolithPort)).isGreaterThanOrEqualTo(1.0);
@@ -131,6 +140,7 @@ public class PostgresOutageIntegrationTest {
             "--spring.kafka.bootstrap-servers=" + kafka.getBootstrapServers(),
             "--spring.flyway.locations=classpath:db/migration",
             "--spring.flyway.schemas=public",
+            "--management.health.redis.enabled=false",
             "--server.port=0");
   }
 
@@ -193,6 +203,24 @@ public class PostgresOutageIntegrationTest {
       Thread.sleep(POLL_MILLIS);
     }
     throw new AssertionError("Committed outbox event for order " + orderId + " was not published");
+  }
+
+  private void awaitAggregateHealth(int port, String expected) throws Exception {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
+    String lastBody = "";
+    while (System.nanoTime() < deadline) {
+      HttpResponse<String> response = get(port, "/actuator/health");
+      lastBody = response.body();
+      var health = new com.fasterxml.jackson.databind.ObjectMapper().readTree(lastBody);
+      if (expected.equals(health.path("status").asText())
+          && expected.equals(health.path("components").path("db").path("status").asText())
+          && response.statusCode() == ("UP".equals(expected) ? 200 : 503)) {
+        return;
+      }
+      Thread.sleep(POLL_MILLIS);
+    }
+    throw new AssertionError(
+        "Aggregate/database health did not become " + expected + ": " + lastBody);
   }
 
   private HttpResponse<String> get(int port, String path) throws IOException, InterruptedException {

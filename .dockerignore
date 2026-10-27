@@ -1,0 +1,6 @@
+.git
+.env
+.env.*
+local-ci/.env
+local-ci/.env.*
+local-ci/secrets/
