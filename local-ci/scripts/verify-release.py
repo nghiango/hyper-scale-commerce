@@ -31,3 +31,15 @@ budget = sum((ceiling + 1) * (p + r)
 assert budget <= 240, f"Database pool budget too large: {budget}"
 assert not re.search(r'IMAGE_PREFIX|COMMIT_SHA', commerce)
 print('Release image, rollout, HPA, pool-budget and monitoring invariants passed.')
+# Central logging must persist data without privileged node log access.
+assert 'claimName: loki-data' in platform
+assert 'claimName: local-grafana-data' in platform
+assert 'kind: ClusterRole' not in platform
+assert 'hostPath:' not in platform
+assert 'privileged: true' not in platform
+assert 'resources: [pods/log]' in platform
+assert 'retention_period: 24h' in platform
+assert 'uid: loki' in platform
+assert 'names = ["hyperscale"]' in platform
+assert 'url = "http://loki:3100/loki/api/v1/push"' in platform
+print('Namespace-scoped logging, persistent storage and Grafana source invariants passed.')

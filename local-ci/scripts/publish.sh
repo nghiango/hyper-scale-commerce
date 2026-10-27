@@ -9,9 +9,13 @@ if ! docker buildx inspect hyperscale-local >/dev/null 2>&1; then
     --buildkitd-config local-ci/buildkitd.toml
 fi
 docker buildx inspect hyperscale-local --bootstrap >/dev/null
+output_flag=(--load)
+if [[ "${PUSH_IMAGES:-false}" == "true" ]]; then
+  output_flag=(--push)
+fi
 for module in app order-query; do
-  docker buildx build --builder hyperscale-local --platform linux/arm64 --push \
+  docker buildx build --builder hyperscale-local --platform linux/arm64 "${output_flag[@]}" \
     --tag "$IMAGE_PREFIX/hyperscale-$module:$REVISION" "$module"
 done
-docker buildx build --builder hyperscale-local --platform linux/arm64 --push \
+docker buildx build --builder hyperscale-local --platform linux/arm64 "${output_flag[@]}" \
   --tag "$IMAGE_PREFIX/hyperscale-patroni:$REVISION" performance/patroni
