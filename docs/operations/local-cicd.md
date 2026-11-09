@@ -194,7 +194,10 @@ kubectl --context kind-hyperscale-k8s -n hyperscale rollout status deploy/app --
 kubectl --context kind-hyperscale-k8s -n hyperscale rollout status deploy/order-query --timeout=300s
 kubectl --context kind-hyperscale-k8s -n hyperscale get pods,hpa
 kubectl --context kind-hyperscale-k8s -n hyperscale top pods
-# Run each port-forward in a separate terminal.
+# Start all UI port-forwards in the background at once:
+make local-ui        # Grafana :3000, Prometheus :9090, Kafka UI :8082, Argo CD :8443
+# (manage with: make local-ui-status / make local-ui-stop)
+# Or run each port-forward manually in a separate terminal:
 kubectl --context kind-hyperscale-k8s -n hyperscale port-forward svc/grafana 3000:3000
 kubectl --context kind-hyperscale-k8s -n hyperscale port-forward svc/prometheus 9090:9090
 kubectl --context kind-hyperscale-k8s -n argocd port-forward svc/argocd-server 8443:443
@@ -497,7 +500,11 @@ Finish active Jenkins builds before stopping. The script targets only containers
 labelled for kind cluster hyperscale-k8s, Compose project hyperscale-local-ci, and
 the exact dedicated BuildKit container buildx_buildkit_hyperscale-local0. It stops
 CI first, then the builder and cluster; it starts the cluster and waits for API,
-node and registry readiness before starting the builder and CI. Existing stopped
+node and registry readiness before starting the builder and CI. After nodes are
+Ready it also restarts the kindnet and kube-proxy DaemonSets: a node-container
+restart leaves their per-worker routing/iptables state stale, which breaks
+cluster DNS (pods cannot reach CoreDNS; for example Argo CD fails to resolve
+argocd-repo-server). The rollout restart rebuilds that state. Existing stopped
 containers are resumed, not recreated. No cluster, container, volume or PVC deletion
 is performed. Other Docker projects are untouched. Startup failure leaves CI
 stopped rather than triggering builds against unavailable infrastructure.

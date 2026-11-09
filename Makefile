@@ -195,3 +195,15 @@ phase18-qualification: ## Run fail-closed Phase 18 Kubernetes/JVM qualification
 .PHONY: local-stack
 local-stack: ## Open interactive start/stop/status menu for the full local stack
 	bash local-ci/scripts/local-stack.sh
+
+.PHONY: local-ui
+local-ui: ## Start background port-forwards: Grafana :3000, Prometheus :9090, Kafka UI :8082, Argo CD :8443, Postgres :5433
+	bash local-ci/scripts/local-ui.sh start
+
+.PHONY: local-ui-stop
+local-ui-stop: ## Stop all background UI port-forwards
+	bash local-ci/scripts/local-ui.sh stop
+
+.PHONY: local-ui-status
+local-ui-status: ## Show status of background UI port-forwards
+	bash local-ci/scripts/local-ui.sh status

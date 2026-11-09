@@ -12,8 +12,9 @@ Without arguments, opens an interactive menu.
 Targets only the hyperscale-k8s kind cluster, hyperscale-local-ci Compose project,
 and buildx_buildkit_hyperscale-local0 builder. Docker must already be running.
 Stop/start preserves existing containers and volumes. Finish Jenkins builds first.
-Start waits for the Kubernetes API, nodes and local registry before starting CI.
-Restart UI port-forwards separately after starting the stack.
+Start waits for the Kubernetes API and nodes, restarts kindnet/kube-proxy to
+heal cluster DNS after the node restart, waits for the local registry, then
+starts CI. Restart UI port-forwards separately after starting the stack.
 HELP
 }
 menu() {
@@ -120,6 +121,11 @@ else
   done
 fi
 run kubectl --context kind-hyperscale-k8s wait --for=condition=Ready nodes --all --timeout=180s
+# Restarting node containers leaves stale CNI/kube-proxy state on workers,
+# which breaks cluster DNS (e.g. Argo CD cannot resolve argocd-repo-server).
+run kubectl --context kind-hyperscale-k8s -n kube-system rollout restart ds/kindnet ds/kube-proxy
+run kubectl --context kind-hyperscale-k8s -n kube-system rollout status ds/kindnet --timeout=180s
+run kubectl --context kind-hyperscale-k8s -n kube-system rollout status ds/kube-proxy --timeout=180s
 run kubectl --context kind-hyperscale-k8s -n local-registry rollout status deployment/registry --timeout=180s
 if [[ ${#builder[@]} -gt 0 ]]; then run docker start "${builder[@]}"; fi
 if [[ ${#ci[@]} -gt 0 ]]; then run docker start "${ci[@]}"; fi
