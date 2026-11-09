@@ -1,0 +1,485 @@
+{
+  "info": {
+    "_postman_id": "hyperscale-commerce-collection",
+    "name": "HyperScale Commerce",
+    "description": "Simulate the buyer flow against the local stack and inspect metrics.\n\nSetup:\n1. Start infra + services: `make services` (or `make up` + `make run`)\n2. Seed catalog: `performance/scripts/seed-data.sh` (creates PERF-SKU-00001..01000)\n3. Import the 'HyperScale Local' environment and select it.\n4. Run the '01 — Buyer Flow' folder top-to-bottom (Collection Runner or manually).\n\nServices:\n- app (write side): http://localhost:8080\n- order-query (read model, async via outbox/Kafka): http://localhost:8081",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "01 — Buyer Flow (run in order)",
+      "description": "End-to-end journey: browse catalog → view product → create order → poll async read model → check metrics.",
+      "item": [
+        {
+          "name": "1. List Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "const items = json.items || json.products || json.content || [];",
+                  "if (items.length > 0) {",
+                  "    pm.collectionVariables.set('productId', items[0].id);",
+                  "    pm.collectionVariables.set('sku', items[0].sku);",
+                  "    console.log('Using productId=' + items[0].id + ' sku=' + items[0].sku);",
+                  "} else {",
+                  "    console.log('Catalog empty — run performance/scripts/seed-data.sh');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{appBaseUrl}}/catalog/products?page=0&size=20",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["catalog", "products"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "query", "value": "Performance", "disabled": true }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Get Product by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{appBaseUrl}}/catalog/products/{{productId}}",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["catalog", "products", "{{productId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Create Order (Idempotency-Key)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Fresh key per run so each order is new; reuse a fixed key to test replay",
+                  "pm.collectionVariables.set('idempotencyKey', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json && json.id) {",
+                  "    pm.collectionVariables.set('orderId', json.id);",
+                  "    pm.collectionVariables.set('pollAttempts', 0);",
+                  "    console.log('Created orderId=' + json.id + ' status=' + json.status);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "{{idempotencyKey}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"sku\": \"{{sku}}\", \"quantity\": 1 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{appBaseUrl}}/orders",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. Poll Order in Read Model",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// The order propagates asynchronously (outbox → Kafka → read model).",
+                  "// Re-run this request until the projection is visible (max ~10s).",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('order projected to read model', () => pm.response.to.have.status(200));",
+                  "    const lag = pm.collectionVariables.get('orderCreatedAt');",
+                  "    pm.collectionVariables.set('pollAttempts', 0);",
+                  "    console.log('Order ' + pm.collectionVariables.get('orderId') + ' visible in read model');",
+                  "    pm.execution.setNextRequest(null);",
+                  "} else {",
+                  "    const attempts = parseInt(pm.collectionVariables.get('pollAttempts') || '0') + 1;",
+                  "    pm.collectionVariables.set('pollAttempts', attempts);",
+                  "    if (attempts < 20) {",
+                  "        console.log('Not projected yet (attempt ' + attempts + '), retrying in 500ms...');",
+                  "        setTimeout(function () { pm.execution.setNextRequest(pm.info.requestName); }, 500);",
+                  "    } else {",
+                  "        pm.test('projection visible within 10s', () => pm.expect.fail('Timed out waiting for order projection'));",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{orderQueryBaseUrl}}/orders/{{orderId}}",
+              "host": ["{{orderQueryBaseUrl}}"],
+              "path": ["orders", "{{orderId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. App Metrics (Prometheus)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "// Useful series to grep in the response:",
+                  "//   http_server_requests_seconds_*  — latency/counts per endpoint",
+                  "//   orders_* / outbox_* / idempotency_* — custom business metrics (if present)",
+                  "const body = pm.response.text();",
+                  "const interesting = body.split('\\n').filter(l =>",
+                  "    l.includes('http_server_requests') && l.includes('/orders'));",
+                  "console.log(interesting.slice(0, 20).join('\\n'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "text/plain" }],
+            "url": {
+              "raw": "{{appBaseUrl}}/actuator/prometheus",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["actuator", "prometheus"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. Order-Query Metrics (Prometheus)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "// Look for kafka_consumer_* and http_server_requests_* series",
+                  "const body = pm.response.text();",
+                  "const interesting = body.split('\\n').filter(l =>",
+                  "    l.includes('kafka_consumer') || (l.includes('http_server_requests') && l.includes('/orders')));",
+                  "console.log(interesting.slice(0, 20).join('\\n'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "text/plain" }],
+            "url": {
+              "raw": "{{orderQueryBaseUrl}}/actuator/prometheus",
+              "host": ["{{orderQueryBaseUrl}}"],
+              "path": ["actuator", "prometheus"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Catalog (app :8080)",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{appBaseUrl}}/catalog/products?page=0&size=20",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["catalog", "products"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" },
+                { "key": "query", "value": "", "disabled": true }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{appBaseUrl}}/catalog/products/{{productId}}",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["catalog", "products", "{{productId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by SKU",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{appBaseUrl}}/catalog/products/sku/{{sku}}",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["catalog", "products", "sku", "{{sku}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product Availability",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{appBaseUrl}}/catalog/products/{{productId}}/availability",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["catalog", "products", "{{productId}}", "availability"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Orders (app :8080)",
+      "item": [
+        {
+          "name": "Create Order (no idempotency key)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "if (json && json.id) pm.collectionVariables.set('orderId', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"sku\": \"{{sku}}\", \"quantity\": 1 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{appBaseUrl}}/orders",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Order (fixed key — replay demo)",
+          "description": "Send this twice with the same Idempotency-Key: the second call returns the cached 201 response instead of creating a duplicate order.",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "console.log('Run this request again — same Idempotency-Key → replayed response, same orderId');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Idempotency-Key", "value": "demo-fixed-key-0001" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"sku\": \"{{sku}}\", \"quantity\": 1 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{appBaseUrl}}/orders",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["orders"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Order Query (read model :8081)",
+      "item": [
+        {
+          "name": "List Orders",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{orderQueryBaseUrl}}/orders?page=0&size=20",
+              "host": ["{{orderQueryBaseUrl}}"],
+              "path": ["orders"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{orderQueryBaseUrl}}/orders/{{orderId}}",
+              "host": ["{{orderQueryBaseUrl}}"],
+              "path": ["orders", "{{orderId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin (order-query :8081)",
+      "item": [
+        {
+          "name": "Replay DLQ",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dlqTopic\": \"order-events.dlq\",\n  \"targetTopic\": \"order-events\",\n  \"maxRecords\": 100\n}"
+            },
+            "url": {
+              "raw": "{{orderQueryBaseUrl}}/admin/dlq/replay",
+              "host": ["{{orderQueryBaseUrl}}"],
+              "path": ["admin", "dlq", "replay"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Observability",
+      "item": [
+        {
+          "name": "App Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{appBaseUrl}}/actuator/health",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "App Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{appBaseUrl}}/actuator/health/readiness",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["actuator", "health", "readiness"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Order-Query Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{orderQueryBaseUrl}}/actuator/health",
+              "host": ["{{orderQueryBaseUrl}}"],
+              "path": ["actuator", "health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "App Info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{appBaseUrl}}/actuator/info",
+              "host": ["{{appBaseUrl}}"],
+              "path": ["actuator", "info"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "orderId", "value": "" },
+    { "key": "productId", "value": "1" },
+    { "key": "sku", "value": "PERF-SKU-00001" },
+    { "key": "idempotencyKey", "value": "" },
+    { "key": "pollAttempts", "value": "0" }
+  ]
+}

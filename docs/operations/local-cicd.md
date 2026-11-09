@@ -194,7 +194,10 @@ kubectl --context kind-hyperscale-k8s -n hyperscale rollout status deploy/app --
 kubectl --context kind-hyperscale-k8s -n hyperscale rollout status deploy/order-query --timeout=300s
 kubectl --context kind-hyperscale-k8s -n hyperscale get pods,hpa
 kubectl --context kind-hyperscale-k8s -n hyperscale top pods
-# Run each port-forward in a separate terminal.
+# Start all UI port-forwards in the background at once:
+make local-ui        # Grafana :3000, Prometheus :9090, Kafka UI :8082, Argo CD :8443
+# (manage with: make local-ui-status / make local-ui-stop)
+# Or run each port-forward manually in a separate terminal:
 kubectl --context kind-hyperscale-k8s -n hyperscale port-forward svc/grafana 3000:3000
 kubectl --context kind-hyperscale-k8s -n hyperscale port-forward svc/prometheus 9090:9090
 kubectl --context kind-hyperscale-k8s -n argocd port-forward svc/argocd-server 8443:443
@@ -470,3 +473,45 @@ For ownership rollback, pause application/infrastructure auto-sync first. Transf
 resources back to the commerce owner deliberately with pruning disabled; do not
 cascade-delete either Argo Application or its workloads/PVCs. A Git revert alone
 is not an ownership migration procedure.
+
+### Stop and resume the whole local stack
+
+Run from the application repository:
+
+```bash
+make local-stack
+```
+
+Choose Start, Stop, Status, Preview start, Preview stop, or Exit from the numbered
+menu. The menu returns after each operation; choose 0 to exit. Running
+`bash local-ci/scripts/local-stack.sh` without arguments opens the same menu.
+Preview choices make no container changes. Existing argument-based commands remain
+available for automation:
+
+```bash
+bash local-ci/scripts/local-stack.sh status
+bash local-ci/scripts/local-stack.sh stop --dry-run
+bash local-ci/scripts/local-stack.sh stop
+# Later, with Docker Desktop running:
+bash local-ci/scripts/local-stack.sh start
+```
+
+Finish active Jenkins builds before stopping. The script targets only containers
+labelled for kind cluster hyperscale-k8s, Compose project hyperscale-local-ci, and
+the exact dedicated BuildKit container buildx_buildkit_hyperscale-local0. It stops
+CI first, then the builder and cluster; it starts the cluster and waits for API,
+node and registry readiness before starting the builder and CI. After nodes are
+Ready it also restarts the kindnet and kube-proxy DaemonSets: a node-container
+restart leaves their per-worker routing/iptables state stale, which breaks
+cluster DNS (pods cannot reach CoreDNS; for example Argo CD fails to resolve
+argocd-repo-server). The rollout restart rebuilds that state. Existing stopped
+containers are resumed, not recreated. No cluster, container, volume or PVC deletion
+is performed. Other Docker projects are untouched. Startup failure leaves CI
+stopped rather than triggering builds against unavailable infrastructure.
+
+`start` requires an existing cluster, Docker Desktop, kubectl and the existing
+kind-hyperscale-k8s kubeconfig context. It does not provision a missing environment.
+It waits for infrastructure startup, not every application to finish recovery.
+Check `kubectl --context kind-hyperscale-k8s -n hyperscale get pods` afterward.
+Restart UI port-forwards separately. Monitoring emptyDir data remains disposable;
+stop/start is not a backup or a guarantee that every pod keeps its identity.

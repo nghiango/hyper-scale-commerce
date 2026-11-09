@@ -15,3 +15,5 @@ python3 local-ci/scripts/verify-release.py "$work"
 python3 local-ci/scripts/test-gitops.py
 
 python3 local-ci/scripts/test-publish.py
+
+python3 local-ci/scripts/test-local-stack.py

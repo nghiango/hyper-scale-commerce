@@ -733,3 +733,17 @@ ownership/health checks, preservation of infrastructure/platform bytes across a
 normal application release, documentation and evidence. Do not alter existing
 unit/integration test policy or advance phases. Owner's current source branch is
 java; preserve it and report deployment-branch publication prerequisites.
+
+### LOCAL-CICD-01 lifecycle helper (owner-approved 2026-10-27)
+
+Owner requests a stop/start script for the existing local stack. Scope: project
+kind node/load-balancer containers, Jenkins controller/agent and dedicated BuildKit
+container. Preserve all containers/volumes and unrelated Docker projects. Provide
+status/dry-run; stop CI before cluster, start cluster/API/nodes/registry before CI.
+Verify shell syntax, mocked lifecycle/isolation/failure behavior and real read-only
+status/dry-run. Do not actually shut down the environment just to verify the helper.
+
+Owner follow-up: expose the lifecycle helper as `make local-stack`; no-argument
+invocation presents numbered start/stop/status/preview/exit choices. Retain explicit
+arguments for automation. Verify menu routing, invalid input/EOF, and Make target
+without stopping running infrastructure.
