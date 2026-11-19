@@ -31,6 +31,20 @@ budget = sum((ceiling + 1) * (p + r)
 assert budget <= 240, f"Database pool budget too large: {budget}"
 assert not re.search(r'IMAGE_PREFIX|COMMIT_SHA', commerce)
 print('Release image, rollout, HPA, pool-budget and monitoring invariants passed.')
+# Credentials come from Vault via External Secrets; nothing secret is rendered from Git.
+for leaked in ('redis_secure_password', 'replicator_pass'):
+    assert leaked not in commerce, leaked
+app_manifests = (root / 'application.yaml').read_text()
+assert len(re.findall(r'name: POSTGRES_PASSWORD\n\s+valueFrom:\n\s+secretKeyRef:\n\s+name: postgres-credentials\n',
+                      app_manifests)) == 2
+assert 'kind: ClusterSecretStore\nmetadata:\n  name: vault-backend\n' in commerce
+for name in ('postgres-credentials', 'redis-secret'):
+    assert re.search(rf'kind: ExternalSecret\nmetadata:\n  name: {name}\n', commerce), name
+assert re.search(r'kind: ExternalSecret\nmetadata:\n  name: local-platform-credentials\n', platform)
+assert 'kind: StatefulSet\nmetadata:\n  name: vault\n' in commerce
+assert 'name: postgres-role-labeler' in commerce
+assert commerce.count('name: APP_RATE_LIMITING_ENABLED') == 2
+print('Vault/External Secrets, role labeler and rate-limit wiring invariants passed.')
 # Central logging must persist data without privileged node log access.
 assert 'claimName: loki-data' in platform
 assert 'claimName: local-grafana-data' in platform
@@ -57,7 +71,8 @@ application = (root / 'application.yaml').read_text()
 infrastructure = (root / 'infrastructure.yaml').read_text()
 assert 'kind: StatefulSet' not in application
 assert 'kind: Namespace' not in application
-assert 'kind: Deployment' not in infrastructure
+# The only infrastructure Deployment is the Patroni role labeler (ADR-0033); business workloads stay in application.
+assert re.findall(r'^kind: Deployment\nmetadata:\n  name: (\S+)', infrastructure, re.M) == ['postgres-role-labeler']
 assert 'kind: HorizontalPodAutoscaler' not in infrastructure
 assert 'hyperscale-patroni:' not in application
 assert len(re.findall(r'^kind: Deployment$', application, re.M)) == 2

@@ -44,8 +44,15 @@ echo "  -> Redis template rendered cleanly (PASSED)"
 
 # 2. Invariant Audit: Authentication & Secret
 echo "Auditing Redis authentication secret..."
-if ! grep -q "kind: Secret" <<<"${redis_manifest}"; then
+# The password Secret is synced from Vault by External Secrets (ADR-0033), never rendered from Git.
+external_secrets_manifest="$(get_manifest "templates/external-secrets.yaml")"
+if ! grep -q "name: redis-secret" <<<"${redis_manifest}" \
+  || ! grep -A2 "^kind: ExternalSecret" <<<"${external_secrets_manifest}" | grep -q "^  name: redis-secret$"; then
   echo "ERROR: Redis Secret is missing!" >&2
+  exit 1
+fi
+if grep -q "kind: Secret" <<<"${redis_manifest}"; then
+  echo "ERROR: Redis password must not be rendered from Git!" >&2
   exit 1
 fi
 echo "  -> Redis Secret verified (PASSED)"

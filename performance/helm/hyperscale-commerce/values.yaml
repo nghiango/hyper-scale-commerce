@@ -127,8 +127,20 @@ postgresHa:
   credentials:
     database: hyperscale
     username: hyperscale
-    password: hyperscale
-    replicatorPassword: replicator_pass
+    # password and replicatorPassword are pulled from Vault via ExternalSecret
+    # (secret/data/hyperscale/postgres) — never commit credentials here.
+  # Patroni role -> pod label sync so postgres-ha-primary tracks the leader.
+  roleLabeler:
+    image:
+      repository: curlimages/curl
+      tag: "8.10.1"
+    resources:
+      requests:
+        cpu: 10m
+        memory: 16Mi
+      limits:
+        cpu: 50m
+        memory: 32Mi
 
 redis:
   enabled: true
@@ -147,7 +159,8 @@ redis:
       memory: 512Mi
   auth:
     enabled: true
-    password: "redis_secure_password"
+    # password is pulled from Vault via ExternalSecret
+    # (secret/data/hyperscale/redis) — never commit credentials here.
   exporter:
     image:
       repository: oliver006/redis_exporter
@@ -175,3 +188,29 @@ localDelivery:
   primaryPoolSize: 8
   replicaPoolSize: 4
   tracingEndpoint: http://otel-collector:9411/api/v2/spans
+  rateLimiting:
+    enabled: false
+    backend: lua
+    limitPerSecond: 5000
+    retryAfterSeconds: 60
+
+# ---------------------------------------------------------------------------
+# Vault (persistent file backend; the vault-init sidecar initializes, stores
+# the unseal key + root token on the PVC, and auto-unseals — no committed
+# token anywhere. For stronger isolation, production should use cloud-KMS or
+# transit auto-unseal instead of on-PVC keys.)
+# ---------------------------------------------------------------------------
+vault:
+  enabled: true
+  image:
+    repository: hashicorp/vault
+    tag: "1.19"
+  storage:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
