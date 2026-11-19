@@ -34,7 +34,16 @@ print('Release image, rollout, HPA, pool-budget and monitoring invariants passed
 # Central logging must persist data without privileged node log access.
 assert 'claimName: loki-data' in platform
 assert 'claimName: local-grafana-data' in platform
-assert 'kind: ClusterRole' not in platform
+# ADR-0032: only the two read-only topic-observability ClusterRoles are allowed.
+cluster_roles = re.findall(
+    r'^kind: ClusterRole\nmetadata:\n  name: (\S+)\nrules:\n((?:  .*\n)+)', platform, re.M)
+assert sorted(n for n, _ in cluster_roles) == ['local-log-reader-topics', 'local-monitoring-topics'], cluster_roles
+assert len(re.findall(r'^kind: ClusterRole$', platform, re.M)) == 2
+for _, rules in cluster_roles:
+    assert set(re.findall(r'verbs: \[([^\]]*)\]', rules)) <= {'get, list, watch', 'get'}, rules
+    assert not re.search(r'secrets|configmaps|\*', rules), rules
+assert sorted(re.findall(r'^kind: ClusterRoleBinding\nmetadata:\n  name: (\S+)', platform, re.M)) == [
+    'local-log-reader-topics', 'local-monitoring-topics']
 assert 'hostPath:' not in platform
 assert 'privileged: true' not in platform
 assert 'resources: [pods/log]' in platform
@@ -42,7 +51,7 @@ assert 'retention_period: 24h' in platform
 assert 'uid: loki' in platform
 assert 'names = ["hyperscale"]' in platform
 assert 'url = "http://loki:3100/loki/api/v1/push"' in platform
-print('Namespace-scoped logging, persistent storage and Grafana source invariants passed.')
+print('Scoped logging RBAC, persistent storage and Grafana source invariants passed.')
 
 application = (root / 'application.yaml').read_text()
 infrastructure = (root / 'infrastructure.yaml').read_text()

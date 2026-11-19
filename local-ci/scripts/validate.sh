@@ -17,3 +17,5 @@ python3 local-ci/scripts/test-gitops.py
 python3 local-ci/scripts/test-publish.py
 
 python3 local-ci/scripts/test-local-stack.py
+
+python3 local-ci/scripts/test-platform-topics.py
